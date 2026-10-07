@@ -10,3 +10,4 @@ coverage/
 # Arquivos locais
 .runtime/
 *.xlsx
+!.env.production
