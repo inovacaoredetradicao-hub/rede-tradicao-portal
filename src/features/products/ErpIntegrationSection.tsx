@@ -119,29 +119,71 @@ export const ErpIntegrationSection: React.FC = () => {
     if (next && !mappingLoaded) void loadMappings();
   };
 
-  useEffect(() => {
-    void loadStatus();
-  }, []);
-
-  const handleSync = async () => {
+  // A sincronizacao leva alguns minutos e roda em segundo plano no servidor: o botao so a
+  // inicia e a tela acompanha o status ate terminar (sem esperar a resposta por minutos).
+  const waitForSyncToFinish = async () => {
     setSyncing(true);
     try {
-      const summary = await triggerErpSync();
-      const errorNote =
-        summary.errors.length > 0 ? ` (${summary.errors.length} aviso(s))` : "";
-      toast.success(
-        `Sincronizado: ${summary.created} criado(s), ${summary.updated} atualizado(s), ${summary.stockUpdated} saldo(s) de estoque${errorNote}.`,
-      );
-      await loadStatus();
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel sincronizar com a Argo.",
-      );
+      const deadline = Date.now() + 20 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, 10000));
+        let current: ErpSyncStatus;
+        try {
+          current = await getErpSyncStatus();
+        } catch {
+          continue; // falha momentanea de rede: tenta de novo no proximo ciclo
+        }
+        setStatus(current);
+        const run = current.lastRun;
+        if (run && run.status !== "em_andamento") {
+          if (run.status === "sucesso") {
+            toast.success(
+              `Sincronizado: ${run.products_created} criado(s), ${run.products_updated} atualizado(s), ${run.stock_updated} saldo(s) de estoque.`,
+            );
+          } else {
+            toast.error(`Sincronizacao terminou com erro: ${run.error_message ?? "veja o detalhe na tela."}`);
+          }
+          return;
+        }
+      }
+      toast.info("A sincronizacao ainda esta rodando. Recarregue a pagina mais tarde para ver o resultado.");
     } finally {
       setSyncing(false);
     }
+  };
+
+  useEffect(() => {
+    void (async () => {
+      await loadStatus();
+    })();
+  }, []);
+
+  // Se a pagina abrir com uma sincronizacao em andamento, acompanha ate terminar.
+  useEffect(() => {
+    if (status?.lastRun?.status === "em_andamento" && !syncing) {
+      void waitForSyncToFinish();
+    }
+  }, [status?.lastRun?.id]);
+
+  const handleSync = async () => {
+    // Marca como sincronizando antes de recarregar o status, para o acompanhamento
+    // automatico (useEffect acima) nao abrir um segundo ciclo em paralelo.
+    setSyncing(true);
+    try {
+      await triggerErpSync();
+      toast.info("Sincronizacao iniciada. Leva alguns minutos; o resultado aparece aqui quando terminar.");
+    } catch (error) {
+      // 409: ja existe uma rodando (ex.: a automatica). Acompanha a que esta em andamento.
+      const message = error instanceof Error ? error.message : "Nao foi possivel sincronizar com a Argo.";
+      if (!/andamento/i.test(message)) {
+        toast.error(message);
+        setSyncing(false);
+        return;
+      }
+      toast.info(message);
+    }
+    await loadStatus();
+    await waitForSyncToFinish();
   };
 
   const handleSaveMapping = async (

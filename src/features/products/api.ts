@@ -167,6 +167,7 @@ export async function getArgoCompanies(): Promise<ArgoCompanyOption[]> {
   }));
 }
 
-export async function triggerErpSync(): Promise<ErpSyncSummary> {
-  return requestJson<ErpSyncSummary>('/integrations/argo/sync', { method: 'POST' });
+/** Inicia a sincronizacao no servidor (roda em segundo plano); acompanhe por getErpSyncStatus. */
+export async function triggerErpSync(): Promise<{ started: boolean }> {
+  return requestJson<{ started: boolean }>('/integrations/argo/sync', { method: 'POST' });
 }
