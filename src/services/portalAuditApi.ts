@@ -1,3 +1,4 @@
+import { authHeaders, notifyIfUnauthorized, withTokenQuery } from '@/lib/session';
 import {
   PortalAuditDashboardSummary,
   PortalAuditUnitLosses,
@@ -21,14 +22,17 @@ async function fetchWithTimeout(input: string, init?: RequestInit) {
   const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
   try {
-    return await fetch(input, {
-      ...init,
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        ...init?.headers,
-      },
-    });
+    return notifyIfUnauthorized(
+      await fetch(input, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          ...authHeaders(),
+          ...init?.headers,
+        },
+      }),
+    );
   } finally {
     window.clearTimeout(timeoutId);
   }
@@ -135,7 +139,7 @@ export async function getPortalReturnDetail(sourceSessionId: string) {
 }
 
 export function getPortalAuditPdfUrl(sourceSessionId: string) {
-  return `${getPortalApiBaseUrl()}/portal/audits/${sourceSessionId}/pdf`;
+  return withTokenQuery(`${getPortalApiBaseUrl()}/portal/audits/${sourceSessionId}/pdf`);
 }
 
 export function getPortalAuditApiBaseUrl() {

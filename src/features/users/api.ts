@@ -1,3 +1,4 @@
+import { authHeaders } from '@/lib/session';
 import { ManagedUser, ManagedUserInput } from './types';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:4000';
@@ -26,7 +27,7 @@ async function request<T>(token: string | undefined, path: string, init?: Reques
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token ?? ''}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : authHeaders()),
         ...init?.headers,
       },
     });

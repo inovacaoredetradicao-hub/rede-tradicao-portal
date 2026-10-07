@@ -13,10 +13,16 @@ import { UniformsRepository } from './modules/uniforms/uniforms.repository.js';
 import { UniformsService } from './modules/uniforms/uniforms.service.js';
 import { UniformsController } from './modules/uniforms/uniforms.controller.js';
 import { createUniformsRouter } from './modules/uniforms/uniforms.routes.js';
+import { requireSession } from './lib/auth.js';
 
 export function createApp() {
   const app = express();
-  const allowedOrigins = new Set([env.PORTAL_FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:4001']);
+  const allowedOrigins = new Set([
+    ...env.PORTAL_FRONTEND_URL.split(',').map((origin) => origin.trim()).filter(Boolean),
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:4001',
+  ]);
   // A maquina de desenvolvimento costuma ter mais de uma rede ativa (Wi-Fi, Ethernet, VPN),
   // e o IP "correto" muda toda vez que a rede muda. Em vez de manter uma lista fixa de
   // IPs (que quebra a cada troca de rede), aceitamos qualquer origem de IP privado de LAN.
@@ -64,6 +70,9 @@ export function createApp() {
   app.get('/health', (_request, response) => {
     response.json({ ok: true, service: 'portal-rede-tradicao-backend' });
   });
+
+  // Tudo abaixo de /health exige login (token emitido pelo backend do app, porta 4000).
+  app.use(requireSession);
 
   app.use(createCatalogRouter(catalogController));
   app.use('/operational-alerts', createOperationalAlertsRouter(controller));

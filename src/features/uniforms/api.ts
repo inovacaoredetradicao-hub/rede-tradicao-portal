@@ -1,3 +1,4 @@
+import { authHeaders, notifyIfUnauthorized } from '@/lib/session';
 import { getOperationalAlertsBackendBaseUrl } from '../operational-alerts/api';
 import { UniformItem, UniformStockRow, UniformTag, UniformUnitStockRow } from './types';
 
@@ -8,11 +9,13 @@ async function fetchWithTimeout(url: string, init?: RequestInit) {
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...init?.headers },
-    });
+    return notifyIfUnauthorized(
+      await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeaders(), ...init?.headers },
+      }),
+    );
   } finally {
     window.clearTimeout(timeoutId);
   }

@@ -1,3 +1,4 @@
+import { authHeaders, notifyIfUnauthorized } from '@/lib/session';
 import {
   ArgoCompanyOption,
   ErpSyncStatus,
@@ -24,15 +25,18 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${getCatalogBaseUrl()}${path}`, {
-      ...init,
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...init?.headers,
-      },
-    });
+    const response = notifyIfUnauthorized(
+      await fetch(`${getCatalogBaseUrl()}${path}`, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+          ...init?.headers,
+        },
+      }),
+    );
 
     if (!response.ok) {
       let message = `Falha na requisicao (${response.status}) em ${path}.`;

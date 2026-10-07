@@ -1,3 +1,4 @@
+import { authHeaders, notifyIfUnauthorized } from '@/lib/session';
 import {
   OperationalCountAlert,
   OperationalAuditResult,
@@ -42,15 +43,18 @@ async function fetchWithTimeout(url: string, init?: RequestInit) {
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...init?.headers,
-      },
-    });
+    return notifyIfUnauthorized(
+      await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...authHeaders(),
+          ...init?.headers,
+        },
+      }),
+    );
   } finally {
     window.clearTimeout(timeoutId);
   }

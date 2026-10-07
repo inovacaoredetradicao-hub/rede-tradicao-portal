@@ -1,3 +1,4 @@
+import { withTokenQuery } from '@/lib/session';
 import React, { useMemo, useState } from 'react';
 import { Eye, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -281,7 +282,7 @@ export const OperationalAuditResultsSection: React.FC<OperationalAuditResultsSec
               <div className="flex justify-end">
                 <Button
                   variant="outline"
-                  onClick={() => window.open(`${portalApiBaseUrl}/portal/audits/${selectedResult.sourceSessionId}/pdf`, '_blank', 'noopener,noreferrer')}
+                  onClick={() => window.open(withTokenQuery(`${portalApiBaseUrl}/portal/audits/${selectedResult.sourceSessionId}/pdf`), '_blank', 'noopener,noreferrer')}
                   disabled={!selectedResult.sourceSessionId}
                 >
                   Ver PDF
