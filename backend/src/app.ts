@@ -53,18 +53,34 @@ export function createApp() {
   const uniformsService = new UniformsService(uniformsRepository);
   const uniformsController = new UniformsController(uniformsService);
 
-  app.use(
+  // Em producao o portal e a API ficam no mesmo endereco (proxy Caddy, que preserva o Host).
+  // O navegador manda Origin em POST/PATCH mesmo sem ser cross-origin, entao aceitamos
+  // quando a origem e o proprio endereco acessado - vale para qualquer dominio publico.
+  const isSameOrigin = (origin: string, host: string | undefined) => {
+    try {
+      return Boolean(host) && new URL(origin).host === host;
+    } catch {
+      return false;
+    }
+  };
+
+  app.use((request, response, next) => {
     cors({
       origin: (origin, callback) => {
-        if (!origin || allowedOrigins.has(origin) || isPrivateLanOrigin(origin)) {
+        if (
+          !origin ||
+          isSameOrigin(origin, request.headers.host) ||
+          allowedOrigins.has(origin) ||
+          isPrivateLanOrigin(origin)
+        ) {
           callback(null, true);
           return;
         }
 
         callback(new Error(`Origem nao permitida por CORS: ${origin}`));
       },
-    }),
-  );
+    })(request, response, next);
+  });
   app.use(express.json());
 
   app.get('/health', (_request, response) => {
