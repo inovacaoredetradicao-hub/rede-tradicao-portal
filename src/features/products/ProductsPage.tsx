@@ -300,15 +300,10 @@ export const ProductsPage: React.FC = () => {
 
       {appliedFilters && (
         <div className="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          {/* Texto montado como uma string so: trechos soltos ao lado de condicionais quebravam
+              o React quando um tradutor do navegador alterava a pagina. */}
           <p>
-            Estoque de <span className="font-medium text-foreground">{appliedUnitsText}</span>
-            {appliedFilters.term && (
-              <>
-                {' '}
-                - busca "<span className="font-medium text-foreground">{appliedFilters.term}</span>"
-              </>
-            )}{' '}
-            - {total.toLocaleString('pt-BR')} produto(s)
+            {`Estoque de ${appliedUnitsText}${appliedFilters.term ? ` - busca "${appliedFilters.term}"` : ''} - ${total.toLocaleString('pt-BR')} produto(s)`}
           </p>
           {total > PAGE_SIZE && (
             <div className="flex items-center gap-2">
