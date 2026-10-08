@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
+  getOperationalClassifications,
   getProductsByClassification,
   getUsersByUnit,
   searchOperationalProducts,
@@ -217,9 +218,51 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
 
   const availableUsers = usersForUnit.length > 0 ? usersForUnit : users;
 
+  // Com filial escolhida, as classificacoes (e as contagens) sao so as daquela filial.
+  const [unitClassifications, setUnitClassifications] = useState<OperationalClassificationOption[] | null>(null);
+  const [loadingUnitClassifications, setLoadingUnitClassifications] = useState(false);
+  const [showAllClassificationProducts, setShowAllClassificationProducts] = useState(false);
+
+  useEffect(() => {
+    if (!form.unitId) {
+      setUnitClassifications(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingUnitClassifications(true);
+    getOperationalClassifications(form.unitId)
+      .then((result) => {
+        if (cancelled) return;
+        setUnitClassifications(result);
+        // A classificacao escolhida pode nao existir na nova filial.
+        setForm((current) =>
+          current.classificationKey && !result.some((option) => option.key === current.classificationKey)
+            ? { ...current, classificationKey: '' }
+            : current,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setUnitClassifications([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingUnitClassifications(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.unitId]);
+
+  const availableClassifications = form.unitId ? unitClassifications ?? [] : classificationOptions;
+
   const selectedClassification = useMemo(() => {
-    return classificationOptions.find((option) => option.key === form.classificationKey) ?? null;
-  }, [classificationOptions, form.classificationKey]);
+    return availableClassifications.find((option) => option.key === form.classificationKey) ?? null;
+  }, [availableClassifications, form.classificationKey]);
+
+  useEffect(() => {
+    setShowAllClassificationProducts(false);
+  }, [form.classificationKey, form.unitId]);
 
   useEffect(() => {
     if (!selectedClassification) {
@@ -695,14 +738,23 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                       value={form.classificationKey}
                       onChange={(event) => setForm((current) => ({ ...current, classificationKey: event.target.value }))}
                     >
-                      <option value="">Selecione uma classificacao</option>
-                      {classificationOptions.map((classification) => (
+                      <option value="">
+                        {form.unitId && loadingUnitClassifications
+                          ? 'Carregando classificacoes da filial...'
+                          : form.unitId && availableClassifications.length === 0
+                            ? 'Nenhuma classificacao com estoque nesta filial'
+                            : 'Selecione uma classificacao'}
+                      </option>
+                      {availableClassifications.map((classification) => (
                         <option key={classification.key} value={classification.key}>
                           {classification.label} ({classification.productCount} produtos)
                         </option>
                       ))}
                     </select>
                   </div>
+                  {form.unitId && (
+                    <p className="text-xs text-muted-foreground">So classificacoes com produtos em estoque nesta filial.</p>
+                  )}
                 </div>
 
                 <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
@@ -726,7 +778,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                     )}
                   </div>
 
-                  {selectedClassification && (
+                  {selectedClassification && !showAllClassificationProducts && (
                     <div className="mt-4 grid gap-2 md:grid-cols-2">
                       {previewClassificationProducts.map((product) => (
                         <div key={product.id} className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
@@ -738,6 +790,39 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                       {selectedClassification.productCount > previewClassificationProducts.length && (
                         <div className="rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
                           +{selectedClassification.productCount - previewClassificationProducts.length} produto(s) no mesmo disparo
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedClassification && classificationProducts.length > 0 && (
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground underline decoration-dotted underline-offset-4 hover:text-primary"
+                        onClick={() => setShowAllClassificationProducts((open) => !open)}
+                      >
+                        {showAllClassificationProducts
+                          ? 'ocultar lista'
+                          : `ver os ${classificationProducts.length} produtos`}
+                      </button>
+
+                      {showAllClassificationProducts && (
+                        <div className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-border bg-background">
+                          {classificationProducts.map((product) => (
+                            <div
+                              key={product.id}
+                              className="flex items-center gap-2 border-b border-border/40 px-3 py-1.5 text-xs last:border-b-0"
+                            >
+                              <span className="flex-1 truncate text-foreground" title={product.name}>
+                                {product.name}
+                              </span>
+                              <span className="shrink-0 font-mono text-muted-foreground">
+                                {product.barcode || product.productCode}
+                              </span>
+                              <StockBadge value={product.stockTotal} unitSelected={Boolean(form.unitId)} />
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>

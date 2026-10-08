@@ -300,8 +300,10 @@ export async function lookupOperationalProducts(ids: string[]) {
 }
 
 /** Classificacoes com contagem de produtos; os produtos de cada uma vem sob demanda. */
-export async function getOperationalClassifications(): Promise<OperationalClassificationOption[]> {
-  const rows = await requestCatalogJson<{ label: string; product_count: number }[]>('/products/classifications');
+/** Com unitId: so as classificacoes (e contagens) de produtos com estoque naquela filial. */
+export async function getOperationalClassifications(unitId?: string): Promise<OperationalClassificationOption[]> {
+  const query = unitId ? `?unitId=${encodeURIComponent(unitId)}` : '';
+  const rows = await requestCatalogJson<{ label: string; product_count: number }[]>(`/products/classifications${query}`);
   return rows.map((row) => ({
     key: normalizeKey(row.label),
     label: row.label,
