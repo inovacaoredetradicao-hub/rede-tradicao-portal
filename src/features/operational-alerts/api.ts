@@ -38,9 +38,9 @@ function getCatalogBaseUrl() {
   return normalizeBaseUrl((((import.meta as any).env?.VITE_CATALOG_API_BASE_URL as string | undefined) || DEFAULT_CATALOG_BASE_URL));
 }
 
-async function fetchWithTimeout(url: string, init?: RequestInit) {
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return notifyIfUnauthorized(
@@ -194,11 +194,29 @@ export async function createOperationalCountRulesBatch(payloads: OperationalRule
     };
   }
 
-  await Promise.all(payloads.map((payload) => createOperationalCountRule(payload)));
+  // Uma requisicao so com o lote inteiro (antes: uma por regra, todas em paralelo).
+  // Sem nova tentativa automatica: repetir um POST que demorou poderia duplicar regras.
+  const response = await fetchWithTimeout(
+    `${getBackendBaseUrl()}${MODULE_PREFIX}/rules/batch`,
+    { method: 'POST', body: JSON.stringify({ rules: payloads }) },
+    120000,
+  ).catch((error) => {
+    throw new Error(
+      error instanceof DOMException && error.name === 'AbortError'
+        ? 'O servidor demorou demais para salvar o disparo. Confira a lista antes de tentar de novo.'
+        : 'Nao foi possivel conectar ao servidor para salvar o disparo.',
+    );
+  });
 
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { message?: string };
+    throw new Error(payload.message || `Falha ao salvar o disparo (${response.status}).`);
+  }
+
+  const result = (await response.json()) as { createdCount: number };
   return {
     mode: 'classification',
-    createdCount: payloads.length,
+    createdCount: result.createdCount,
     skippedCount: 0,
   };
 }

@@ -20,6 +20,11 @@ export const createRuleSchema = z.object({
 
 export const updateRuleSchema = createRuleSchema.partial();
 
+// Disparo com varios produtos/usuarios (ex.: classificacao inteira) chega numa requisicao so.
+export const createRulesBatchSchema = z.object({
+  rules: z.array(createRuleSchema).min(1).max(50000),
+});
+
 export const completeAlertSchema = z.object({
   auditSessionId: z.string().min(1),
 });

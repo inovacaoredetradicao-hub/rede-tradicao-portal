@@ -114,6 +114,24 @@ export class OperationalAlertsService {
     return this.repository.createRule(await this.resolveResponsibleUser(input));
   }
 
+  async createRulesBatch(inputs: CreateRuleInput[]) {
+    // Resolve o nome de cada responsavel uma vez so (o lote repete os mesmos usuarios).
+    const names = new Map<string, string | null>();
+    const resolved: CreateRuleInput[] = [];
+    for (const input of inputs) {
+      if (!input.responsibleUserId || input.responsibleUserName?.trim()) {
+        resolved.push(input);
+        continue;
+      }
+      if (!names.has(input.responsibleUserId)) {
+        const user = await this.repository.findUserById(input.responsibleUserId);
+        names.set(input.responsibleUserId, user?.name ?? null);
+      }
+      resolved.push({ ...input, responsibleUserName: names.get(input.responsibleUserId) ?? input.responsibleUserName });
+    }
+    return this.repository.createRulesBatch(resolved);
+  }
+
   async getRuleById(ruleId: string) {
     const rule = await this.repository.findRuleById(ruleId);
 

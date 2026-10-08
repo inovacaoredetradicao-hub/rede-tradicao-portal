@@ -81,7 +81,8 @@ export function createApp() {
       },
     })(request, response, next);
   });
-  app.use(express.json());
+  // Lote de regras de um disparo por classificacao pode ter milhares de itens (~MBs).
+  app.use(express.json({ limit: '25mb' }));
 
   app.get('/health', (_request, response) => {
     response.json({ ok: true, service: 'portal-rede-tradicao-backend' });

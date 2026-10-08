@@ -377,6 +377,49 @@ export class OperationalAlertsRepository {
     return result.rows[0];
   }
 
+  // Grava muitas regras de uma vez (uma transacao, INSERT com unnest em blocos de 1000).
+  // Antes o portal mandava uma requisicao por regra, todas em paralelo, e um disparo por
+  // classificacao (milhares de produtos) estourava o navegador.
+  async createRulesBatch(inputs: CreateRuleInput[]) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      let created = 0;
+      for (let start = 0; start < inputs.length; start += 1000) {
+        const chunk = inputs.slice(start, start + 1000);
+        const column = <K extends keyof CreateRuleInput>(key: K) => chunk.map((input) => input[key] ?? null);
+        const result = await client.query(
+          `
+            INSERT INTO operational_count_rules (
+              product_id, barcode, product_name, unit_id, unit_name, frequency,
+              execution_deadline_minutes, is_active, start_date, end_date,
+              responsible_user_id, responsible_user_name, group_id
+            )
+            SELECT * FROM unnest(
+              $1::uuid[], $2::text[], $3::text[], $4::uuid[], $5::text[], $6::text[],
+              $7::int[], $8::bool[], $9::date[], $10::date[],
+              $11::uuid[], $12::text[], $13::uuid[]
+            )
+          `,
+          [
+            column('productId'), column('barcode'), column('productName'), column('unitId'),
+            column('unitName'), column('frequency'), column('executionDeadlineMinutes'),
+            column('isActive'), column('startDate'), column('endDate'),
+            column('responsibleUserId'), column('responsibleUserName'), column('groupId'),
+          ],
+        );
+        created += result.rowCount ?? 0;
+      }
+      await client.query('COMMIT');
+      return created;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async updateRule(ruleId: string, input: UpdateRuleInput) {
     const assignments: string[] = [];
     const values: unknown[] = [];
