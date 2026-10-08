@@ -221,7 +221,8 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
   // Com filial escolhida, as classificacoes (e as contagens) sao so as daquela filial.
   const [unitClassifications, setUnitClassifications] = useState<OperationalClassificationOption[] | null>(null);
   const [loadingUnitClassifications, setLoadingUnitClassifications] = useState(false);
-  const [showAllClassificationProducts, setShowAllClassificationProducts] = useState(false);
+  // A lista completa da classificacao ja abre aberta; o link so serve para recolher.
+  const [showAllClassificationProducts, setShowAllClassificationProducts] = useState(true);
 
   useEffect(() => {
     if (!form.unitId) {
@@ -261,7 +262,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
   }, [availableClassifications, form.classificationKey]);
 
   useEffect(() => {
-    setShowAllClassificationProducts(false);
+    setShowAllClassificationProducts(true);
   }, [form.classificationKey, form.unitId]);
 
   useEffect(() => {
@@ -803,7 +804,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                         onClick={() => setShowAllClassificationProducts((open) => !open)}
                       >
                         {showAllClassificationProducts
-                          ? 'ocultar lista'
+                          ? `ocultar lista (${classificationProducts.length} produtos)`
                           : `ver os ${classificationProducts.length} produtos`}
                       </button>
 
