@@ -137,6 +137,7 @@ function normalizeProduct(raw: any): OperationalProductOption {
     stockType: stockType || undefined,
     subGroup: subGroup || undefined,
     displayLabel: [barcode, name].filter(Boolean).join(' • '),
+    stockTotal: raw.stock_total === null || raw.stock_total === undefined ? undefined : Number(raw.stock_total),
   };
 }
 
@@ -258,9 +259,11 @@ export async function getOperationalAlertsDashboardSummary() {
 // abaixo buscam so o necessario no backend, sob demanda.
 
 /** Busca de produtos para escolher no disparo (pagina pequena, so ativos). */
-export async function searchOperationalProducts(term: string, limit = 50) {
+/** Com unitId, o estoque de cada produto vem so daquela filial; sem, soma todas. */
+export async function searchOperationalProducts(term: string, limit = 50, unitId?: string) {
   const params = new URLSearchParams({ limit: String(limit) });
   if (term.trim()) params.set('q', term.trim());
+  if (unitId) params.set('unitIds', unitId);
   const result = await requestCatalogJson<{ items: any[]; total: number }>(`/products/search?${params.toString()}`);
   return {
     items: result.items.map(normalizeProduct).filter((product) => product.id && product.name),
@@ -289,8 +292,9 @@ export async function getOperationalClassifications(): Promise<OperationalClassi
   }));
 }
 
-export async function getProductsByClassification(label: string) {
-  const products = await requestCatalogJson<any[]>(`/products/by-classification?label=${encodeURIComponent(label)}`);
+export async function getProductsByClassification(label: string, unitId?: string) {
+  const unitQuery = unitId ? `&unitId=${encodeURIComponent(unitId)}` : '';
+  const products = await requestCatalogJson<any[]>(`/products/by-classification?label=${encodeURIComponent(label)}${unitQuery}`);
   return products.map(normalizeProduct).filter((product) => product.id && product.name);
 }
 

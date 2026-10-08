@@ -48,6 +48,19 @@ function generateGroupId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+const stockFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
+
+/** Estoque do produto na filial escolhida no disparo (ou total, sem filial). */
+const StockBadge: React.FC<{ value?: number; unitSelected: boolean }> = ({ value, unitSelected }) => {
+  if (value === undefined) return null;
+  const tone = value < 0 ? 'text-rose-600' : value === 0 ? 'text-muted-foreground' : 'text-foreground';
+  return (
+    <span className={`shrink-0 font-mono text-xs ${tone}`}>
+      {unitSelected ? 'Estoque' : 'Estoque total'}: {stockFormatter.format(value)}
+    </span>
+  );
+};
+
 interface OperationalCountRuleFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -120,10 +133,16 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
   const [classificationProducts, setClassificationProducts] = useState<OperationalProductOption[]>([]);
   const [loadingClassification, setLoadingClassification] = useState(false);
 
+  // Trocou a filial com uma busca ja feita: refaz para o estoque refletir a nova filial.
+  useEffect(() => {
+    if (productsSearched) void runProductSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.unitId]);
+
   const runProductSearch = async () => {
     setSearchingProducts(true);
     try {
-      const result = await searchOperationalProducts(form.productSearch, 50);
+      const result = await searchOperationalProducts(form.productSearch, 50, form.unitId || undefined);
       setProductResults(result.items);
       setProductResultsTotal(result.total);
       setProductsSearched(true);
@@ -210,7 +229,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
 
     let cancelled = false;
     setLoadingClassification(true);
-    getProductsByClassification(selectedClassification.label)
+    getProductsByClassification(selectedClassification.label, form.unitId || undefined)
       .then((result) => {
         if (!cancelled) setClassificationProducts(result);
       })
@@ -224,7 +243,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
     return () => {
       cancelled = true;
     };
-  }, [selectedClassification]);
+  }, [selectedClassification, form.unitId]);
 
   const previewClassificationProducts = classificationProducts.slice(0, 8);
 
@@ -546,7 +565,8 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                               form.productId === product.id ? 'bg-primary/10 font-medium' : ''
                             }`}
                           >
-                            <span className="text-foreground">{product.displayLabel}</span>
+                            <span className="flex-1 text-foreground">{product.displayLabel}</span>
+                            <StockBadge value={product.stockTotal} unitSelected={Boolean(form.unitId)} />
                           </button>
                         ))}
                         {productResultsTotal > productResults.length && (
@@ -625,7 +645,8 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                               checked={selectedProducts.some((item) => item.id === product.id)}
                               onCheckedChange={() => toggleProductSelection(product)}
                             />
-                            <span className="text-foreground">{product.displayLabel}</span>
+                            <span className="flex-1 text-foreground">{product.displayLabel}</span>
+                            <StockBadge value={product.stockTotal} unitSelected={Boolean(form.unitId)} />
                           </label>
                         ))}
                         {productResultsTotal > productResults.length && (
@@ -711,6 +732,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                         <div key={product.id} className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
                           <p className="font-medium text-foreground">{product.name}</p>
                           <p className="text-xs text-muted-foreground">{product.barcode || product.productCode || product.id}</p>
+                          <StockBadge value={product.stockTotal} unitSelected={Boolean(form.unitId)} />
                         </div>
                       ))}
                       {selectedClassification.productCount > previewClassificationProducts.length && (

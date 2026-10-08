@@ -95,6 +95,8 @@ export interface OperationalProductOption {
   stockType?: string;
   subGroup?: string;
   displayLabel: string;
+  /** Estoque na filial escolhida (ou total), quando a busca pede. */
+  stockTotal?: number;
 }
 
 export interface OperationalClassificationOption {
