@@ -15,6 +15,7 @@ import {
   runOperationalAlertsScheduler,
   toggleOperationalCountRule,
   updateOperationalCountRule,
+  updateOperationalCountRulesBatch,
 } from '@/features/operational-alerts/api';
 import {
   OperationalCountAlert,
@@ -248,6 +249,7 @@ export function useOperationalCountAdmin() {
             startDate: firstRule.startDate,
             endDate: firstRule.endDate,
             representativeRule: firstRule,
+            responsibleCount: new Set(groupRules.map((rule) => rule.responsibleUserId ?? '')).size,
             searchText: `${names.join(' ')} ${groupRules.map((rule) => rule.barcode).join(' ')} ${firstRule.unitName}`.toLowerCase(),
           },
         ];
@@ -291,6 +293,7 @@ export function useOperationalCountAdmin() {
           startDate: firstRule.startDate,
           endDate: firstRule.endDate,
           representativeRule: firstRule,
+          responsibleCount: new Set(groupRules.map((rule) => rule.responsibleUserId ?? '')).size,
           searchText: `${classificationLabel} ${groupRules.map((rule) => `${rule.productName} ${rule.barcode}`).join(' ')} ${firstRule.unitName}`.toLowerCase(),
         },
       ];
@@ -352,6 +355,12 @@ export function useOperationalCountAdmin() {
     setSaving(true);
 
     try {
+      if (input.mode === 'edit-batch') {
+        const { updatedCount } = await updateOperationalCountRulesBatch(input.ruleIds, input.changes);
+        await loadData();
+        return { mode: 'product', createdCount: updatedCount, skippedCount: 0 };
+      }
+
       if (input.mode === 'edit') {
         await updateOperationalCountRule(editingRuleId!, input.payload);
         await loadData();

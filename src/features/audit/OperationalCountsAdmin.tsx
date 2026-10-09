@@ -20,6 +20,7 @@ import {
   searchOperationalProducts,
 } from '@/features/operational-alerts/api';
 import {
+  EditingRuleGroup,
   OperationalCountRule,
   OperationalProductOption,
   OperationalRuleListItem,
@@ -61,6 +62,7 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
   const [isUserUnitsOpen, setIsUserUnitsOpen] = useState(false);
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<OperationalCountRule | null>(null);
+  const [editingGroup, setEditingGroup] = useState<EditingRuleGroup | null>(null);
   const [productCatalogSearch, setProductCatalogSearch] = useState('');
   // Consulta de mercadorias sob demanda (botao/Enter), 100 por vez.
   const [catalogResults, setCatalogResults] = useState<OperationalProductOption[]>([]);
@@ -113,19 +115,27 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
 
   const handleOpenCreate = () => {
     setEditingRule(null);
+    setEditingGroup(null);
     setIsFormOpen(true);
   };
 
   const handleEditRule = (rule: OperationalRuleListItem) => {
-    if (rule.type === 'classification') {
-      toast.info('Edicao de lote por classificacao ainda nao esta disponivel. Use ativar, desativar ou excluir o lote.');
-      return;
-    }
-
     if (!rule.representativeRule) {
       return;
     }
 
+    // Lote (classificacao ou varios produtos): a edicao vale para todas as regras dele.
+    setEditingGroup(
+      rule.ruleIds.length > 1
+        ? {
+            ruleIds: rule.ruleIds,
+            title: rule.title,
+            type: rule.type,
+            productCount: rule.productCount,
+            responsibleCount: rule.responsibleCount ?? 1,
+          }
+        : null,
+    );
     setEditingRule(rule.representativeRule as OperationalCountRule);
     setIsFormOpen(true);
   };
@@ -133,6 +143,11 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
   const handleSaveRule = async (payload: OperationalRuleSubmitInput, editingRuleId?: string | null) => {
     try {
       const result = await saveRule(payload, editingRuleId);
+
+      if (payload.mode === 'edit-batch') {
+        toast.success(`Lote atualizado: ${result.createdCount} regra(s).`);
+        return result;
+      }
 
       if (editingRuleId) {
         toast.success('Regra atualizada com sucesso.');
@@ -374,6 +389,7 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
         units={units}
         users={users}
         editingRule={editingRule}
+        editingGroup={editingGroup}
       />
 
       <Dialog open={isProductsOpen} onOpenChange={setIsProductsOpen}>

@@ -21,6 +21,7 @@ import {
 } from '@/features/operational-alerts/api';
 import {
   CountFrequency,
+  EditingRuleGroup,
   OperationalClassificationOption,
   OperationalCountRule,
   OperationalProductOption,
@@ -71,6 +72,8 @@ interface OperationalCountRuleFormProps {
   units: OperationalUnitOption[];
   users: OperationalUserOption[];
   editingRule?: OperationalCountRule | null;
+  /** Preenchido quando o item editado e um lote (classificacao ou varios produtos). */
+  editingGroup?: EditingRuleGroup | null;
 }
 
 interface RuleFormState {
@@ -120,7 +123,11 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
   units,
   users,
   editingRule,
+  editingGroup,
 }) => {
+  const isGroupEdit = Boolean(editingRule && editingGroup && editingGroup.ruleIds.length > 1);
+  // Lote com varios responsaveis: trocar por um so juntaria todos no mesmo usuario.
+  const keepResponsibles = isGroupEdit && (editingGroup?.responsibleCount ?? 1) > 1;
   const [form, setForm] = useState<RuleFormState>(EMPTY_FORM);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [usersForUnit, setUsersForUnit] = useState<OperationalUserOption[]>([]);
@@ -385,7 +392,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
       return;
     }
 
-    if (form.selectedUserIds.length === 0) {
+    if (form.selectedUserIds.length === 0 && !keepResponsibles) {
       setValidationError('Selecione ao menos um usuario desta filial para receber o disparo.');
       return;
     }
@@ -393,6 +400,27 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
     const selectedUsers = form.selectedUserIds
       .map((id) => availableUsers.find((user) => user.id === id))
       .filter((user): user is OperationalUserOption => Boolean(user));
+
+    if (isGroupEdit && editingGroup && editingRule) {
+      const user = selectedUsers[0];
+      await onSubmit(
+        {
+          mode: 'edit-batch',
+          ruleIds: editingGroup.ruleIds,
+          changes: {
+            frequency: form.frequency,
+            executionDeadlineMinutes: Number(form.executionDeadlineMinutes),
+            isActive: form.isActive,
+            startDate: form.startDate,
+            endDate: form.endDate || null,
+            ...(keepResponsibles || !user ? {} : { responsibleUserId: user.id, responsibleUserName: user.name }),
+          },
+        },
+        editingRule.id,
+      );
+      onOpenChange(false);
+      return;
+    }
 
     if (editingRule) {
       const user = selectedUsers[0];
@@ -470,7 +498,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader>
-          <SheetTitle>{editingRule ? 'Editar disparo' : 'Novo disparo'}</SheetTitle>
+          <SheetTitle>{isGroupEdit ? 'Editar lote' : editingRule ? 'Editar disparo' : 'Novo disparo'}</SheetTitle>
           <SheetDescription>Escolha a filial, depois quem vai receber o disparo, e por fim o que sera contado.</SheetDescription>
         </SheetHeader>
 
@@ -484,6 +512,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                 className="flex h-11 w-full rounded-md border border-input bg-background pl-10 pr-3 text-sm"
                 value={form.unitId}
                 onChange={(event) => handleUnitSelection(event.target.value)}
+                disabled={isGroupEdit}
               >
                 <option value="">Selecione a filial para disparar</option>
                 {units.map((unit) => (
@@ -498,6 +527,9 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
           <div className="space-y-2 rounded-xl border border-border/60 p-4">
             <div className="flex items-center justify-between gap-2">
               <Label>2. Usuarios desta filial que vao receber o disparo</Label>
+              {keepResponsibles && (
+                <span className="text-xs text-muted-foreground">Lote com varios responsaveis: eles serao mantidos.</span>
+              )}
               {!editingRule && availableUsers.length > 0 && (
                 <div className="flex gap-2">
                   <Button type="button" variant="ghost" size="sm" onClick={selectAllUsers}>
@@ -569,7 +601,18 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {editingRule ? (
+            {isGroupEdit && editingGroup ? (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 md:col-span-2">
+                <p className="text-sm font-semibold text-foreground">
+                  {editingGroup.type === 'classification' ? 'Lote por classificacao' : 'Lote de produtos'}: {editingGroup.title}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {editingGroup.productCount} produto(s) nesta filial. As alteracoes abaixo (frequencia, prazo, datas,
+                  regra ativa{keepResponsibles ? '' : ' e responsavel'}) valem para todos os produtos do lote. Para mudar os
+                  produtos ou a filial, exclua o lote e crie um novo disparo.
+                </p>
+              </div>
+            ) : editingRule ? (
               <>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Trocar produto (opcional)</Label>

@@ -10,6 +10,7 @@ import {
   OperationalUnitOption,
   OperationalUserOption,
   OperationalClassificationOption,
+  OperationalRuleBatchEditPayload,
 } from './types';
 
 const DEFAULT_BACKEND_BASE_URL = 'http://localhost:4001';
@@ -219,6 +220,16 @@ export async function createOperationalCountRulesBatch(payloads: OperationalRule
     createdCount: result.createdCount,
     skippedCount: 0,
   };
+}
+
+export async function updateOperationalCountRulesBatch(
+  ruleIds: string[],
+  changes: OperationalRuleBatchEditPayload['changes'],
+) {
+  return requestOperationalJson<{ updatedCount: number }>(`${MODULE_PREFIX}/rules/batch`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ruleIds, changes }),
+  });
 }
 
 export async function updateOperationalCountRule(ruleId: string, payload: Partial<OperationalRulePayload>) {

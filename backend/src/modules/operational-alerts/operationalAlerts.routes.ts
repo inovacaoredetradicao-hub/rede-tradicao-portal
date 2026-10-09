@@ -11,6 +11,7 @@ export function createOperationalAlertsRouter(controller: OperationalAlertsContr
   router.post('/rules/batch', asyncHandler(controller.createRulesBatch));
   router.get('/rules', asyncHandler(controller.listRules));
   router.get('/rules/:id', asyncHandler(controller.getRuleById));
+  router.patch('/rules/batch', asyncHandler(controller.updateRulesBatch));
   router.patch('/rules/:id', asyncHandler(controller.updateRule));
   router.patch('/rules/:id/toggle', asyncHandler(controller.toggleRule));
   router.delete('/rules/:id', asyncHandler(controller.deleteRule));

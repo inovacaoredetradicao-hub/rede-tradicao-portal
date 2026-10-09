@@ -420,6 +420,38 @@ export class OperationalAlertsRepository {
     }
   }
 
+  // Aplica as mesmas alteracoes a todas as regras de um lote (uma instrucao so).
+  async updateRulesBatch(ruleIds: string[], input: UpdateRuleInput) {
+    const mapping: Record<string, unknown> = {
+      frequency: input.frequency,
+      execution_deadline_minutes: input.executionDeadlineMinutes,
+      is_active: input.isActive,
+      start_date: input.startDate,
+      end_date: input.endDate,
+      responsible_user_id: input.responsibleUserId,
+      responsible_user_name: input.responsibleUserName,
+    };
+    const assignments: string[] = [];
+    const values: unknown[] = [];
+    Object.entries(mapping).forEach(([column, value]) => {
+      if (value === undefined) return;
+      values.push(value);
+      assignments.push(`${column} = $${values.length}`);
+    });
+    if (assignments.length === 0) return 0;
+
+    values.push(ruleIds);
+    const result = await query(
+      `
+        UPDATE operational_count_rules
+        SET ${assignments.join(', ')}, updated_at = NOW()
+        WHERE id = ANY($${values.length}::uuid[])
+      `,
+      values,
+    );
+    return result.rowCount ?? 0;
+  }
+
   async updateRule(ruleId: string, input: UpdateRuleInput) {
     const assignments: string[] = [];
     const values: unknown[] = [];

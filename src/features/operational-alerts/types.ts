@@ -76,7 +76,32 @@ export interface OperationalRuleEditPayload {
   payload: OperationalRulePayload;
 }
 
-export type OperationalRuleSubmitInput = OperationalRuleEditPayload | OperationalRuleBatchPayload;
+/** Edicao de um lote inteiro: so os campos comuns (produto e filial nao mudam). */
+export interface OperationalRuleBatchEditPayload {
+  mode: 'edit-batch';
+  ruleIds: string[];
+  changes: Partial<
+    Pick<
+      OperationalRulePayload,
+      'frequency' | 'executionDeadlineMinutes' | 'isActive' | 'startDate' | 'endDate' | 'responsibleUserId' | 'responsibleUserName'
+    >
+  >;
+}
+
+export type OperationalRuleSubmitInput =
+  | OperationalRuleEditPayload
+  | OperationalRuleBatchPayload
+  | OperationalRuleBatchEditPayload;
+
+/** Lote aberto para edicao na tela de Gestao de contagens. */
+export interface EditingRuleGroup {
+  ruleIds: string[];
+  title: string;
+  type: 'product' | 'classification';
+  productCount: number;
+  /** Quantos responsaveis diferentes o lote tem (com mais de 1, o responsavel nao muda). */
+  responsibleCount: number;
+}
 
 export interface OperationalRuleSubmitResult {
   mode: 'product' | 'classification';
@@ -123,6 +148,7 @@ export interface OperationalRuleListItem {
   endDate: string | null;
   representativeRule?: OperationalCountRule;
   searchText: string;
+  responsibleCount?: number;
 }
 
 export interface OperationalUnitOption {

@@ -142,6 +142,10 @@ export class OperationalAlertsService {
     return rule;
   }
 
+  async updateRulesBatch(ruleIds: string[], input: UpdateRuleInput) {
+    return this.repository.updateRulesBatch(ruleIds, await this.resolveResponsibleUser(input));
+  }
+
   async updateRule(ruleId: string, input: UpdateRuleInput) {
     return this.repository.updateRule(ruleId, await this.resolveResponsibleUser(input));
   }

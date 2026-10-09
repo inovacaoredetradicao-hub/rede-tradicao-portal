@@ -1,7 +1,13 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { OperationalAlertsService } from './operationalAlerts.service.js';
-import { completeAlertSchema, createRuleSchema, createRulesBatchSchema, updateRuleSchema } from './operationalAlerts.schemas.js';
+import {
+  completeAlertSchema,
+  createRuleSchema,
+  createRulesBatchSchema,
+  updateRuleSchema,
+  updateRulesBatchSchema,
+} from './operationalAlerts.schemas.js';
 import { CompleteAlertInput, CreateRuleInput, UpdateRuleInput } from './operationalAlerts.types.js';
 
 function firstQueryValue(value: string | string[] | undefined) {
@@ -41,6 +47,15 @@ export class OperationalAlertsController {
     const { rules } = createRulesBatchSchema.parse(request.body) as { rules: CreateRuleInput[] };
     const createdCount = await this.service.createRulesBatch(rules);
     response.status(201).json({ createdCount });
+  };
+
+  updateRulesBatch = async (request: Request, response: Response) => {
+    const { ruleIds, changes } = updateRulesBatchSchema.parse(request.body) as {
+      ruleIds: string[];
+      changes: UpdateRuleInput;
+    };
+    const updatedCount = await this.service.updateRulesBatch(ruleIds, changes);
+    response.json({ updatedCount });
   };
 
   updateRule = async (request: Request, response: Response) => {
