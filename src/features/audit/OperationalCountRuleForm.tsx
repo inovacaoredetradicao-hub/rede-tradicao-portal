@@ -611,6 +611,21 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                   regra ativa{keepResponsibles ? '' : ' e responsavel'}) valem para todos os produtos do lote. Para mudar os
                   produtos ou a filial, exclua o lote e crie um novo disparo.
                 </p>
+                {editingGroup.products.length > 0 && (
+                  <div className="mt-3 max-h-64 overflow-y-auto rounded-lg border border-border bg-background">
+                    {editingGroup.products.map((product, index) => (
+                      <div
+                        key={`${product.id}-${index}`}
+                        className="flex items-center gap-2 border-b border-border/40 px-3 py-1.5 text-xs last:border-b-0"
+                      >
+                        <span className="flex-1 truncate text-foreground" title={product.name}>
+                          {product.name}
+                        </span>
+                        <span className="shrink-0 font-mono text-muted-foreground">{product.barcode}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : editingRule ? (
               <>

@@ -16,9 +16,21 @@ interface OperationalCountRulesTableProps {
 }
 
 function formatFrequency(value: OperationalRuleListItem['frequency']) {
+  if (value === 'unica') return 'Unica';
   if (value === 'diario') return 'Diario';
   if (value === 'quinzenal') return 'Quinzenal';
   return 'Mensal';
+}
+
+// A tabela so identifica o disparo; os produtos de um lote aparecem no "Editar".
+function describeRule(rule: OperationalRuleListItem) {
+  if (rule.type === 'classification') {
+    return { title: rule.title, detail: `Classificacao · ${rule.productCount} produtos` };
+  }
+  if (rule.productCount > 1) {
+    return { title: `Lote de ${rule.productCount} produtos`, detail: 'Produtos especificos' };
+  }
+  return { title: rule.title, detail: null };
 }
 
 export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProps> = ({
@@ -51,7 +63,7 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="pl-6">Produto</TableHead>
+                <TableHead className="pl-6">Disparo</TableHead>
                 <TableHead>Filial</TableHead>
                 <TableHead>Frequencia</TableHead>
                 <TableHead>Prazo</TableHead>
@@ -61,12 +73,16 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rules.map((rule) => (
+              {rules.map((rule) => {
+                const description = describeRule(rule);
+                return (
                 <TableRow key={rule.id}>
-                  <TableCell className="pl-6">
-                    <div className="space-y-1">
-                      <p className="font-semibold text-foreground">{rule.title}</p>
-                      {rule.subtitle && <p className="text-xs text-muted-foreground">{rule.subtitle}</p>}
+                  <TableCell className="max-w-72 pl-6">
+                    <div className="space-y-0.5">
+                      <p className="truncate font-semibold text-foreground" title={description.title}>
+                        {description.title}
+                      </p>
+                      {description.detail && <p className="text-xs text-muted-foreground">{description.detail}</p>}
                     </div>
                   </TableCell>
                   <TableCell className="max-w-52 truncate">{rule.unitName}</TableCell>
@@ -85,7 +101,7 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
                         variant="outline"
                         size="icon"
                         onClick={() => onEdit(rule)}
-                        title={rule.type === 'classification' ? 'Editar lote de classificacao' : 'Editar regra'}
+                        title={rule.ruleIds.length > 1 ? 'Editar lote (ver produtos)' : 'Editar regra'}
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -112,7 +128,8 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}

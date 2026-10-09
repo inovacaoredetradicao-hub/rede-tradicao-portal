@@ -133,6 +133,7 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
             type: rule.type,
             productCount: rule.productCount,
             responsibleCount: rule.responsibleCount ?? 1,
+            products: rule.products ?? [],
           }
         : null,
     );

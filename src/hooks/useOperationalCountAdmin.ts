@@ -250,6 +250,7 @@ export function useOperationalCountAdmin() {
             endDate: firstRule.endDate,
             representativeRule: firstRule,
             responsibleCount: new Set(groupRules.map((rule) => rule.responsibleUserId ?? '')).size,
+            products: groupRules.map((rule) => ({ id: rule.productId, name: rule.productName, barcode: rule.barcode })),
             searchText: `${names.join(' ')} ${groupRules.map((rule) => rule.barcode).join(' ')} ${firstRule.unitName}`.toLowerCase(),
           },
         ];
@@ -294,6 +295,7 @@ export function useOperationalCountAdmin() {
           endDate: firstRule.endDate,
           representativeRule: firstRule,
           responsibleCount: new Set(groupRules.map((rule) => rule.responsibleUserId ?? '')).size,
+          products: groupRules.map((rule) => ({ id: rule.productId, name: rule.productName, barcode: rule.barcode })),
           searchText: `${classificationLabel} ${groupRules.map((rule) => `${rule.productName} ${rule.barcode}`).join(' ')} ${firstRule.unitName}`.toLowerCase(),
         },
       ];

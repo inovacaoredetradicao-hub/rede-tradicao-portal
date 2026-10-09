@@ -101,6 +101,7 @@ export interface EditingRuleGroup {
   productCount: number;
   /** Quantos responsaveis diferentes o lote tem (com mais de 1, o responsavel nao muda). */
   responsibleCount: number;
+  products: RuleGroupProduct[];
 }
 
 export interface OperationalRuleSubmitResult {
@@ -149,6 +150,14 @@ export interface OperationalRuleListItem {
   representativeRule?: OperationalCountRule;
   searchText: string;
   responsibleCount?: number;
+  /** Produtos do lote (para listar dentro do "Editar"; a tabela nao mostra). */
+  products?: RuleGroupProduct[];
+}
+
+export interface RuleGroupProduct {
+  id: string;
+  name: string;
+  barcode: string;
 }
 
 export interface OperationalUnitOption {
