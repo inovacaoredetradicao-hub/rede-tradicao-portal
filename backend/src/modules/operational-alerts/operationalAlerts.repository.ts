@@ -292,6 +292,16 @@ export class OperationalAlertsRepository {
     return result.rows[0] ?? null;
   }
 
+  // O app manda o id da auditoria NO CELULAR (source_session_id); a ligacao do aviso aponta
+  // para portal_audits.id (gerado no servidor). Aceita os dois; null se ainda nao chegou.
+  async findPortalAuditId(reference: string) {
+    const result = await query<{ id: string }>(
+      `SELECT id FROM portal_audits WHERE id::text = $1 OR source_session_id = $1 LIMIT 1`,
+      [reference],
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
   async findUserById(userId: string) {
     const result = await query<ResponsibleUserLookup>(
       `

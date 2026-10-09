@@ -237,9 +237,10 @@ export class OperationalAlertsService {
   }
 
   async completeAlert(alertId: string, input: CompleteAlertInput) {
-    return this.transitionAlert(alertId, 'concluido', {
-      linkedAuditSessionId: input.auditSessionId,
-    });
+    // Antes gravava o id do celular direto e a FK para portal_audits recusava: o aviso nunca
+    // fechava e o app mostrava "nao foi possivel atualizar o aviso operacional".
+    const linkedAuditSessionId = await this.repository.findPortalAuditId(input.auditSessionId);
+    return this.transitionAlert(alertId, 'concluido', { linkedAuditSessionId });
   }
 
   async expireAlert(alertId: string) {
@@ -453,6 +454,9 @@ export class OperationalAlertsService {
     }
 
     if (alert.status === 'concluido') {
+      // Idempotente: o envio da auditoria ao portal ja conclui o aviso, e o app confirma
+      // logo depois - isso nao pode virar erro.
+      if (targetStatus === 'concluido') return alert;
       throw new Error('Este lote ja foi concluido.');
     }
 
