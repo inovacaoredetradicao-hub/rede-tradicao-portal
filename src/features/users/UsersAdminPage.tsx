@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Copy, KeyRound, Pencil, Search, ShieldCheck, UserPlus } from 'lucide-react';
+import { Copy, KeyRound, Pencil, Search, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import { useAuth } from '@/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getUnitsErpMapping } from '@/features/products/api';
 import { UnitErpMapping } from '@/features/products/types';
-import { createUser, generatePassword, listUsers, updateUser, UsersApiError } from './api';
+import { createUser, deleteUser, generatePassword, listUsers, updateUser, UsersApiError } from './api';
 import { ManagedUser, ManagedUserRole, ROLE_LABELS } from './types';
 
 const unitLabel = (unit: { name: string; erpCompanyId: number | null }) =>
@@ -24,9 +24,10 @@ interface FormState {
   role: ManagedUserRole;
   unitIds: string[];
   isActive: boolean;
+  isMaster: boolean;
 }
 
-const EMPTY_FORM: FormState = { name: '', username: '', password: '', role: 'auditor', unitIds: [], isActive: true };
+const EMPTY_FORM: FormState = { name: '', username: '', password: '', role: 'auditor', unitIds: [], isActive: true, isMaster: false };
 
 export const UsersAdminPage: React.FC = () => {
   const { profile, logout } = useAuth();
@@ -110,6 +111,7 @@ export const UsersAdminPage: React.FC = () => {
       role: user.role,
       unitIds: user.units.map((unit) => unit.id),
       isActive: user.isActive,
+      isMaster: user.isMaster,
     });
     setUnitSearch('');
     setDialogOpen(true);
@@ -145,7 +147,8 @@ export const UsersAdminPage: React.FC = () => {
           name: form.name.trim(),
           role: form.role,
           unitIds: form.unitIds,
-          ...(editingUser.isMaster ? {} : { isActive: form.isActive }),
+          isMaster: form.isMaster,
+          ...(form.isMaster ? {} : { isActive: form.isActive }),
           ...(password ? { password } : {}),
         });
         toast.success('Usuario atualizado.');
@@ -156,6 +159,7 @@ export const UsersAdminPage: React.FC = () => {
           password,
           role: form.role,
           unitIds: form.unitIds,
+          isMaster: form.isMaster,
         });
         toast.success('Usuario criado.');
       }
@@ -167,6 +171,25 @@ export const UsersAdminPage: React.FC = () => {
       await load();
     } catch (error) {
       handleError(error, 'Nao foi possivel salvar o usuario.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isEditingSelf = Boolean(editingUser && profile?.id === editingUser.id);
+
+  const handleDelete = async () => {
+    if (!editingUser) return;
+    if (!window.confirm(`Excluir definitivamente o usuario "${editingUser.name}" (${editingUser.username})?`)) return;
+
+    setSaving(true);
+    try {
+      await deleteUser(token, editingUser.id);
+      toast.success('Usuario excluido.');
+      setDialogOpen(false);
+      await load();
+    } catch (error) {
+      handleError(error, 'Nao foi possivel excluir o usuario.');
     } finally {
       setSaving(false);
     }
@@ -360,7 +383,7 @@ export const UsersAdminPage: React.FC = () => {
                   <button
                     key={role}
                     type="button"
-                    disabled={editingUser?.isMaster && role !== 'admin'}
+                    disabled={form.isMaster && role !== 'admin'}
                     onClick={() => setForm((current) => ({ ...current, role }))}
                     className={`rounded-lg border p-3 text-left text-sm transition-colors disabled:opacity-50 ${
                       form.role === role ? 'border-primary bg-primary/5' : 'border-border bg-background'
@@ -427,7 +450,28 @@ export const UsersAdminPage: React.FC = () => {
               </div>
             </div>
 
-            {editingUser && !editingUser.isMaster && (
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+              <div>
+                <p className="flex items-center gap-1 text-sm font-semibold text-foreground">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  Master
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isEditingSelf && form.isMaster
+                    ? 'Voce nao pode retirar o seu proprio acesso master.'
+                    : 'Pode criar, editar e excluir usuarios (aba Usuarios). Sempre com perfil Gestao.'}
+                </p>
+              </div>
+              <Switch
+                checked={form.isMaster}
+                disabled={isEditingSelf && form.isMaster}
+                onCheckedChange={(checked) =>
+                  setForm((current) => ({ ...current, isMaster: checked, role: checked ? 'admin' : current.role }))
+                }
+              />
+            </div>
+
+            {editingUser && !form.isMaster && (
               <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Usuario ativo</p>
@@ -441,13 +485,28 @@ export const UsersAdminPage: React.FC = () => {
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? 'Salvando...' : editingUser ? 'Salvar alteracoes' : 'Criar usuario'}
-            </Button>
+          <DialogFooter className="gap-2 sm:justify-between">
+            {editingUser && !editingUser.isMaster && !isEditingSelf ? (
+              <Button
+                variant="ghost"
+                className="text-rose-600 hover:bg-rose-500/10 hover:text-rose-600"
+                onClick={() => void handleDelete()}
+                disabled={saving}
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                Excluir usuario
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button onClick={() => void handleSave()} disabled={saving}>
+                {saving ? 'Salvando...' : editingUser ? 'Salvar alteracoes' : 'Criar usuario'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

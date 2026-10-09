@@ -24,6 +24,8 @@ export interface ManagedUserInput {
   password?: string;
   role: ManagedUserRole;
   unitIds: string[];
+  /** Master: pode criar e gerenciar usuarios (sempre com perfil Gestao). */
+  isMaster?: boolean;
 }
 
 export const ROLE_LABELS: Record<ManagedUserRole, string> = {

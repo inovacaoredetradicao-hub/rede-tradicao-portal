@@ -60,6 +60,11 @@ export function updateUser(token: string | undefined, userId: string, input: Par
   return request<ManagedUser>(token, `/admin/users/${userId}`, { method: 'PATCH', body: JSON.stringify(input) });
 }
 
+/** Exclui de vez. Usuario com historico recebe 409 (orientacao: desativar). */
+export function deleteUser(token: string | undefined, userId: string) {
+  return request<{ deleted: boolean }>(token, `/admin/users/${userId}`, { method: 'DELETE' });
+}
+
 /** Senha aleatoria legivel (sem 0/O, 1/l/I) para entregar ao usuario. */
 export function generatePassword(length = 10) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
