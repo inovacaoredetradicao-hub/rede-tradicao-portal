@@ -1,5 +1,6 @@
 export type CountFrequency = 'unica' | 'diario' | 'quinzenal' | 'mensal';
-export type OperationalAlertStatus = 'pendente' | 'em_andamento' | 'concluido' | 'vencido';
+// 'cancelado' = excluido pela gestao (some do app, fica no historico).
+export type OperationalAlertStatus = 'pendente' | 'em_andamento' | 'concluido' | 'vencido' | 'cancelado';
 
 export interface OperationalCountRule {
   id: string;
@@ -20,12 +21,19 @@ export interface OperationalCountRule {
   updatedAt: string;
 }
 
-export interface OperationalCountAlert {
-  id: string;
-  ruleId: string;
+export interface OperationalCountAlertItem {
   productId: string;
   barcode: string;
   productName: string;
+}
+
+/** Aviso (lote) entregue ao app: um ou varios produtos para a filial contar. */
+export interface OperationalCountAlert {
+  id: string;
+  type: 'product' | 'classification';
+  classificationLabel: string | null;
+  title: string;
+  description: string;
   unitId: string;
   unitName: string;
   responsibleUserId: string | null;
@@ -34,11 +42,9 @@ export interface OperationalCountAlert {
   dueAt: string;
   status: OperationalAlertStatus;
   linkedAuditSessionId: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  expiredAt: string | null;
   createdAt: string;
   updatedAt: string;
+  items: OperationalCountAlertItem[];
 }
 
 export interface OperationalAlertsDashboardSummary {

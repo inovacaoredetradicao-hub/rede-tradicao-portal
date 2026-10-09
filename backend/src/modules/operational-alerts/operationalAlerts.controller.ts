@@ -162,6 +162,11 @@ export class OperationalAlertsController {
     response.json(alert);
   };
 
+  cancelAlert = async (request: Request, response: Response) => {
+    const alert = await this.service.cancelAlert(String(request.params.id));
+    response.json(alert);
+  };
+
   expireAlert = async (request: Request, response: Response) => {
     const alert = await this.service.expireAlert(String(request.params.id));
     response.json(alert);

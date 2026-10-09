@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS operational_count_alerts (
   responsible_user_name TEXT NULL,
   scheduled_at TIMESTAMPTZ NOT NULL,
   due_at TIMESTAMPTZ NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('pendente', 'em_andamento', 'concluido', 'vencido')),
+  status TEXT NOT NULL CHECK (status IN ('pendente', 'em_andamento', 'concluido', 'vencido', 'cancelado')),
   linked_audit_session_id UUID NULL,
   started_at TIMESTAMPTZ NULL,
   completed_at TIMESTAMPTZ NULL,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS operational_alert_batches (
   responsible_user_name TEXT NULL,
   scheduled_at TIMESTAMPTZ NOT NULL,
   due_at TIMESTAMPTZ NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('pendente', 'em_andamento', 'concluido', 'vencido')),
+  status TEXT NOT NULL CHECK (status IN ('pendente', 'em_andamento', 'concluido', 'vencido', 'cancelado')),
   linked_audit_session_id UUID NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

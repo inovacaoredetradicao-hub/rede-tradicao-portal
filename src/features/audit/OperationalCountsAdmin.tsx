@@ -43,6 +43,7 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
     setAuditResultFilters,
     filteredRules,
     filteredAlerts,
+    cancelAlert,
     filteredAuditResults,
     loading,
     saving,
@@ -369,7 +370,7 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
       <div className="flex justify-end">
         <Button variant="outline" className="gap-2" onClick={() => setIsAlertsOpen(true)}>
           <BellRing className="h-4 w-4" />
-          Ver lotes/alertas gerados ({filteredAlerts.length})
+          Ver avisos no app ({filteredAlerts.filter((alert) => alert.status === 'pendente' || alert.status === 'em_andamento').length})
         </Button>
       </div>
 
@@ -474,7 +475,18 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
             <DialogTitle>Lotes/alertas gerados</DialogTitle>
             <DialogDescription>Lotes disparados a partir das regras, com status pendente, em andamento, concluido ou vencido.</DialogDescription>
           </DialogHeader>
-          <OperationalCountAlertsTable loading={loading} alerts={filteredAlerts} />
+          <OperationalCountAlertsTable
+            loading={loading}
+            alerts={filteredAlerts}
+            onCancel={async (alertId) => {
+              try {
+                await cancelAlert(alertId);
+                toast.success('Aviso excluido. Ele ja nao aparece mais no app.');
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : 'Nao foi possivel excluir o aviso.');
+              }
+            }}
+          />
         </DialogContent>
       </Dialog>
 

@@ -233,6 +233,11 @@ export class OperationalAlertsService {
     return this.transitionAlert(alertId, 'vencido');
   }
 
+  // "Excluir aviso" do portal: tira do app na hora (o app so lista 'pendente').
+  async cancelAlert(alertId: string) {
+    return this.transitionAlert(alertId, 'cancelado');
+  }
+
   async expireOverdueAlerts(referenceDate = new Date()) {
     return this.repository.expireOverdueBatches(referenceDate.toISOString());
   }
@@ -365,7 +370,7 @@ export class OperationalAlertsService {
 
   private async transitionAlert(
     alertId: string,
-    targetStatus: 'em_andamento' | 'concluido' | 'vencido',
+    targetStatus: 'em_andamento' | 'concluido' | 'vencido' | 'cancelado',
     fields: { linkedAuditSessionId?: string | null } = {},
   ) {
     const alert = await this.repository.findBatchById(alertId);
@@ -376,6 +381,10 @@ export class OperationalAlertsService {
 
     if (alert.status === 'concluido') {
       throw new Error('Este lote ja foi concluido.');
+    }
+
+    if (alert.status === 'cancelado' && targetStatus === 'em_andamento') {
+      throw new Error('Este aviso foi excluido pela gestao e nao esta mais disponivel.');
     }
 
     return this.repository.updateBatchStatus(alertId, targetStatus, fields);

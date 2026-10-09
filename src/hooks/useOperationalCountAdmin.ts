@@ -16,6 +16,7 @@ import {
   toggleOperationalCountRule,
   updateOperationalCountRule,
   updateOperationalCountRulesBatch,
+  cancelOperationalCountAlert,
 } from '@/features/operational-alerts/api';
 import {
   OperationalCountAlert,
@@ -317,14 +318,18 @@ export function useOperationalCountAdmin() {
   }, [filters, products, rules]);
 
   const filteredAlerts = useMemo(() => {
+    const productSearch = filters.productSearch.toLowerCase();
+    const unitSearch = filters.unitSearch.toLowerCase();
     return alerts.filter((alert) => {
       const matchesProduct =
-        !filters.productSearch ||
-        alert.productName.toLowerCase().includes(filters.productSearch.toLowerCase()) ||
-        alert.barcode.toLowerCase().includes(filters.productSearch.toLowerCase());
-      const matchesUnit =
-        !filters.unitSearch ||
-        alert.unitName.toLowerCase().includes(filters.unitSearch.toLowerCase());
+        !productSearch ||
+        (alert.title || '').toLowerCase().includes(productSearch) ||
+        (alert.items ?? []).some(
+          (item) =>
+            (item.productName || '').toLowerCase().includes(productSearch) ||
+            (item.barcode || '').toLowerCase().includes(productSearch),
+        );
+      const matchesUnit = !unitSearch || (alert.unitName || '').toLowerCase().includes(unitSearch);
 
       return matchesProduct && matchesUnit;
     });
@@ -400,6 +405,16 @@ export function useOperationalCountAdmin() {
     }
   };
 
+  const cancelAlert = async (alertId: string) => {
+    setSaving(true);
+    try {
+      await cancelOperationalCountAlert(alertId);
+      await loadData();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const toggleRule = async (ruleId: string) => {
     setSaving(true);
 
@@ -460,6 +475,7 @@ export function useOperationalCountAdmin() {
     setAuditResultFilters,
     filteredRules,
     filteredAlerts,
+    cancelAlert,
     filteredAuditResults,
     loading,
     saving,

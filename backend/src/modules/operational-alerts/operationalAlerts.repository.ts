@@ -589,7 +589,7 @@ export class OperationalAlertsRepository {
           AND classification_key = $2
           AND unit_id = $3
           AND responsible_user_id IS NOT DISTINCT FROM $4
-          AND scheduled_at = $5::timestamptz
+          AND (scheduled_at AT TIME ZONE 'America/Sao_Paulo')::date = ($5::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date
       `,
       [input.type, input.classificationKey, input.unitId, input.responsibleUserId, input.scheduledAt],
     );
@@ -810,6 +810,24 @@ export class OperationalAlertsRepository {
 
     const batches = await this.attachBatchItems(result.rows);
     return batches[0] ?? null;
+  }
+
+  // Garante o status 'cancelado' em bancos criados antes dele existir.
+  async ensureCancelledStatus() {
+    await query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'operational_alert_batches_status_check'
+            AND pg_get_constraintdef(oid) LIKE '%cancelado%'
+        ) THEN
+          ALTER TABLE operational_alert_batches DROP CONSTRAINT IF EXISTS operational_alert_batches_status_check;
+          ALTER TABLE operational_alert_batches ADD CONSTRAINT operational_alert_batches_status_check
+            CHECK (status IN ('pendente', 'em_andamento', 'concluido', 'vencido', 'cancelado'));
+        END IF;
+      END $$;
+    `);
   }
 
   async updateBatchStatus(batchId: string, status: AlertStatus, fields: { linkedAuditSessionId?: string | null } = {}) {

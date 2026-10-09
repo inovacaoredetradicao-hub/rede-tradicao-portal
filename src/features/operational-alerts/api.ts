@@ -255,6 +255,14 @@ export async function getOperationalCountAlerts() {
   return requestOperationalJson<OperationalCountAlert[]>(`${MODULE_PREFIX}/alerts`);
 }
 
+/** Exclui o aviso do app (status 'cancelado'; continua no historico do portal). */
+export async function cancelOperationalCountAlert(alertId: string) {
+  return requestOperationalJson<OperationalCountAlert>(`${MODULE_PREFIX}/alerts/${alertId}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export async function getOperationalAuditResults() {
   return requestOperationalJson<OperationalAuditResult[]>(`${MODULE_PREFIX}/results`);
 }

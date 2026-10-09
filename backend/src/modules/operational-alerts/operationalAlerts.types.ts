@@ -1,5 +1,6 @@
 export type CountFrequency = 'unica' | 'diario' | 'quinzenal' | 'mensal';
-export type AlertStatus = 'pendente' | 'em_andamento' | 'concluido' | 'vencido';
+// 'cancelado' = excluido pela gestao no portal: some do app, mas fica no historico.
+export type AlertStatus = 'pendente' | 'em_andamento' | 'concluido' | 'vencido' | 'cancelado';
 export type OperationalAlertBatchType = 'product' | 'classification';
 
 export interface OperationalCountRule {

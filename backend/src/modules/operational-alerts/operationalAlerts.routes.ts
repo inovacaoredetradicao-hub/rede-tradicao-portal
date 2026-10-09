@@ -24,6 +24,7 @@ export function createOperationalAlertsRouter(controller: OperationalAlertsContr
   router.post('/alerts/:id/start', asyncHandler(controller.startAlert));
   router.post('/alerts/:id/complete', asyncHandler(controller.completeAlert));
   router.post('/alerts/:id/expire', asyncHandler(controller.expireAlert));
+  router.post('/alerts/:id/cancel', asyncHandler(controller.cancelAlert));
 
   router.post('/scheduler/run', asyncHandler(controller.runScheduler));
   router.get('/dashboard-summary', asyncHandler(controller.getDashboardSummary));
