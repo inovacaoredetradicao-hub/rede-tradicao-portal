@@ -17,6 +17,7 @@ import {
   updateOperationalCountRule,
   updateOperationalCountRulesBatch,
   cancelOperationalCountAlert,
+  dispatchOperationalRules,
 } from '@/features/operational-alerts/api';
 import {
   OperationalCountAlert,
@@ -448,6 +449,17 @@ export function useOperationalCountAdmin() {
     }
   };
 
+  const dispatchRules = async (ruleIds: string[]) => {
+    setSaving(true);
+    try {
+      const result = await dispatchOperationalRules(ruleIds);
+      await loadData();
+      return result;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const runScheduler = async () => {
     setRunningScheduler(true);
 
@@ -476,6 +488,7 @@ export function useOperationalCountAdmin() {
     filteredRules,
     filteredAlerts,
     cancelAlert,
+    dispatchRules,
     filteredAuditResults,
     loading,
     saving,

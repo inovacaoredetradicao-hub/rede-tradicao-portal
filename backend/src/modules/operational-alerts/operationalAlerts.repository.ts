@@ -319,6 +319,21 @@ export class OperationalAlertsRepository {
     return result.rows[0] ?? null;
   }
 
+  async findRulesByIds(ruleIds: string[]) {
+    const result = await query<OperationalCountRule>(
+      `
+        SELECT ${ruleSelect}
+        FROM operational_count_rules
+        LEFT JOIN products
+          ON products.id = operational_count_rules.product_id
+        WHERE operational_count_rules.id = ANY($1::uuid[])
+      `,
+      [ruleIds],
+    );
+
+    return result.rows;
+  }
+
   async createRule(input: CreateRuleInput) {
     const result = await query<OperationalCountRule>(
       `

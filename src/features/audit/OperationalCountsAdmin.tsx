@@ -56,6 +56,7 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
     deleteRule,
     deleteAuditResult,
     runScheduler,
+    dispatchRules,
   } = useOperationalCountAdmin();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -364,7 +365,22 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
         onEdit={handleEditRule}
         onToggle={handleToggleRule}
         onDelete={handleDeleteRule}
-        onRunScheduler={handleRunScheduler}
+        onDispatch={async (ruleIds) => {
+          try {
+            const result = await dispatchRules(ruleIds);
+            if (result.created > 0) {
+              toast.success(
+                result.skipped > 0
+                  ? `Disparado para o app (${result.created} aviso). ${result.skipped} ja tinha aviso aberto no app.`
+                  : 'Disparado! O aviso ja aparece no app da filial.',
+              );
+            } else {
+              toast.info('Ja existe um aviso aberto no app para esta regra. Exclua ou conclua o atual antes de disparar de novo.');
+            }
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Nao foi possivel disparar.');
+          }
+        }}
       />
 
       <div className="flex justify-end">

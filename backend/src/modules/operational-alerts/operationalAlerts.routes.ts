@@ -9,6 +9,7 @@ export function createOperationalAlertsRouter(controller: OperationalAlertsContr
 
   router.post('/rules', asyncHandler(controller.createRule));
   router.post('/rules/batch', asyncHandler(controller.createRulesBatch));
+  router.post('/rules/dispatch', asyncHandler(controller.dispatchRules));
   router.get('/rules', asyncHandler(controller.listRules));
   router.get('/rules/:id', asyncHandler(controller.getRuleById));
   router.patch('/rules/batch', asyncHandler(controller.updateRulesBatch));

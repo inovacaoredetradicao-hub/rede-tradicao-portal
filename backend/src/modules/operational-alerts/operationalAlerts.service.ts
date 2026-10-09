@@ -64,7 +64,9 @@ function shouldGenerateForRule(rule: OperationalCountRule, referenceDate: Date) 
 
   switch (rule.frequency) {
     case 'unica':
-      return diffInDays === 0;
+      // "Unica" = disparo manual: fica ativa no periodo e so vai ao app quando alguem
+      // clica em Disparar no portal (dispatchRulesNow). O agendador nunca dispara.
+      return false;
     case 'diario':
       return true;
     case 'quinzenal':
@@ -301,12 +303,72 @@ export class OperationalAlertsService {
 
       createdBatches.push(batch);
 
-      if (group.frequency === 'unica') {
-        await Promise.all(group.rules.map((rule) => this.repository.updateRule(rule.id, { isActive: false })));
-      }
     }
 
     return createdBatches;
+  }
+
+  // Botao "Disparar" do portal: gera agora o aviso das regras escolhidas (uma regra ou um
+  // lote), qualquer que seja a frequencia. Exige regra ativa e hoje dentro do periodo.
+  // Nao duplica: se o grupo ja tem aviso aberto no app (pendente/em andamento), pula.
+  async dispatchRulesNow(ruleIds: string[]) {
+    const rules = await this.repository.findRulesByIds(ruleIds);
+    if (rules.length === 0) {
+      throw new Error('Regra nao encontrada.');
+    }
+
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const eligible = rules.filter(
+      (rule) => rule.isActive && rule.startDate <= today && (!rule.endDate || rule.endDate >= today),
+    );
+    if (eligible.length === 0) {
+      const anyActive = rules.some((rule) => rule.isActive);
+      throw new Error(
+        anyActive
+          ? 'Hoje esta fora do periodo da regra (data inicial/final). Ajuste as datas para disparar.'
+          : 'A regra esta inativa. Ative-a para disparar.',
+      );
+    }
+
+    const now = new Date();
+    let created = 0;
+    let skipped = 0;
+
+    for (const group of this.groupRulesByBatch(eligible)) {
+      const hasOpenBatch = await this.repository.hasOpenBatchForGroup({
+        type: group.type,
+        classificationKey: group.classificationKey,
+        unitId: group.unitId,
+        responsibleUserId: group.responsibleUserId,
+      });
+      if (hasOpenBatch) {
+        skipped += 1;
+        continue;
+      }
+
+      await this.repository.createBatch({
+        type: group.type,
+        classificationKey: group.classificationKey,
+        classificationLabel: group.classificationLabel,
+        unitId: group.unitId,
+        unitName: group.unitName,
+        responsibleUserId: group.responsibleUserId,
+        responsibleUserName: group.responsibleUserName,
+        scheduledAt: toIsoDate(now),
+        dueAt: addMinutes(now, group.executionDeadlineMinutes).toISOString(),
+        status: 'pendente',
+        linkedAuditSessionId: null,
+        items: group.rules.map((rule) => ({
+          ruleId: rule.id,
+          productId: rule.productId,
+          barcode: rule.barcode,
+          productName: rule.productName,
+        })),
+      });
+      created += 1;
+    }
+
+    return { created, skipped };
   }
 
   private groupRulesByBatch(rules: OperationalCountRule[]) {

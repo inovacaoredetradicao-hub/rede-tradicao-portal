@@ -123,6 +123,12 @@ export class OperationalAlertsController {
     response.json(summary);
   };
 
+  dispatchRules = async (request: Request, response: Response) => {
+    const { ruleIds } = z.object({ ruleIds: z.array(z.string().uuid()).min(1).max(50000) }).parse(request.body);
+    const result = await this.service.dispatchRulesNow(ruleIds);
+    response.json(result);
+  };
+
   runScheduler = async (request: Request, response: Response) => {
     const bodySchema = z
       .object({

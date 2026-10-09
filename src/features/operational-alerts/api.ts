@@ -255,6 +255,14 @@ export async function getOperationalCountAlerts() {
   return requestOperationalJson<OperationalCountAlert[]>(`${MODULE_PREFIX}/alerts`);
 }
 
+/** Botao Disparar: manda agora para o app o aviso desta regra/lote (qualquer frequencia). */
+export async function dispatchOperationalRules(ruleIds: string[]) {
+  return requestOperationalJson<{ created: number; skipped: number }>(`${MODULE_PREFIX}/rules/dispatch`, {
+    method: 'POST',
+    body: JSON.stringify({ ruleIds }),
+  });
+}
+
 /** Exclui o aviso do app (status 'cancelado'; continua no historico do portal). */
 export async function cancelOperationalCountAlert(alertId: string) {
   return requestOperationalJson<OperationalCountAlert>(`${MODULE_PREFIX}/alerts/${alertId}/cancel`, {

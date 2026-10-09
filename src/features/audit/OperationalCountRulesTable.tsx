@@ -12,11 +12,12 @@ interface OperationalCountRulesTableProps {
   onEdit: (rule: OperationalRuleListItem) => void;
   onToggle: (ruleIds: string[]) => Promise<void>;
   onDelete: (ruleIds: string[]) => Promise<void>;
-  onRunScheduler: () => Promise<void>;
+  /** Manda agora para o app o aviso desta regra/lote. */
+  onDispatch: (ruleIds: string[]) => Promise<void>;
 }
 
 function formatFrequency(value: OperationalRuleListItem['frequency']) {
-  if (value === 'unica') return 'Unica';
+  if (value === 'unica') return 'Unica (manual)';
   if (value === 'diario') return 'Diario';
   if (value === 'quinzenal') return 'Quinzenal';
   return 'Mensal';
@@ -39,13 +40,15 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
   onEdit,
   onToggle,
   onDelete,
-  onRunScheduler,
+  onDispatch,
 }) => {
   return (
     <Card className="border-border/60 shadow-sm">
       <CardHeader>
         <CardTitle className="text-xl">Regras cadastradas</CardTitle>
-        <CardDescription>Edite rapidamente as regras e use o disparo manual para testar o fluxo com o app mobile.</CardDescription>
+        <CardDescription>
+          Use ▶ para mandar o aviso de uma regra ao app na hora. Regras "Unica (manual)" so vao ao app por esse botao.
+        </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
@@ -122,7 +125,7 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                      <Button size="icon" onClick={() => void onRunScheduler()} title="Disparar teste">
+                      <Button size="icon" onClick={() => void onDispatch(rule.ruleIds)} title="Disparar agora para o app">
                         <Play className="h-4 w-4" />
                       </Button>
                     </div>

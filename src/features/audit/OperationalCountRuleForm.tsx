@@ -898,14 +898,15 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                 value={form.frequency}
                 onChange={(event) => setForm((current) => ({ ...current, frequency: event.target.value as CountFrequency }))}
               >
-                <option value="unica">Unica (nao repete)</option>
+                <option value="unica">Unica (disparo manual)</option>
                 <option value="diario">Diario</option>
                 <option value="quinzenal">Quinzenal</option>
                 <option value="mensal">Mensal</option>
               </select>
               {form.frequency === 'unica' && (
                 <p className="text-xs text-muted-foreground">
-                  Dispara uma vez na data inicial e a regra e desativada automaticamente depois.
+                  Fica ativa durante o periodo e so vai para o app quando voce clicar em Disparar (▶) na lista de regras.
+                  Pode disparar quantas vezes precisar dentro do periodo.
                 </p>
               )}
             </div>
