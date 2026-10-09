@@ -145,7 +145,17 @@ export class OperationalAlertsService {
   }
 
   async updateRulesBatch(ruleIds: string[], input: UpdateRuleInput) {
-    return this.repository.updateRulesBatch(ruleIds, await this.resolveResponsibleUser(input));
+    const updated = await this.repository.updateRulesBatch(ruleIds, await this.resolveResponsibleUser(input));
+    if (input.isActive === false) {
+      await this.repository.cancelOpenBatchesForRules(ruleIds);
+    }
+    return updated;
+  }
+
+  // Excluir regra/lote de uma vez (antes: uma requisicao por produto do lote).
+  async deleteRulesBatch(ruleIds: string[]) {
+    await this.repository.cancelOpenBatchesForRules(ruleIds);
+    return this.repository.deleteRulesBatch(ruleIds);
   }
 
   async updateRule(ruleId: string, input: UpdateRuleInput) {
@@ -171,6 +181,7 @@ export class OperationalAlertsService {
   }
 
   async deleteRule(ruleId: string) {
+    await this.repository.cancelOpenBatchesForRules([ruleId]);
     const rule = await this.repository.deleteRule(ruleId);
 
     if (!rule) {

@@ -10,7 +10,7 @@ interface OperationalCountRulesTableProps {
   loading: boolean;
   rules: OperationalRuleListItem[];
   onEdit: (rule: OperationalRuleListItem) => void;
-  onToggle: (ruleIds: string[]) => Promise<void>;
+  onToggle: (ruleIds: string[], nextActive: boolean) => Promise<void>;
   onDelete: (ruleIds: string[]) => Promise<void>;
   /** Manda agora para o app o aviso desta regra/lote. */
   onDispatch: (ruleIds: string[]) => Promise<void>;
@@ -111,7 +111,7 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => void onToggle(rule.ruleIds)}
+                        onClick={() => void onToggle(rule.ruleIds, !rule.isActive)}
                         title={rule.isActive ? 'Desativar regra' : 'Ativar regra'}
                       >
                         <Power className="h-4 w-4" />

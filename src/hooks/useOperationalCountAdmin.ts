@@ -4,7 +4,6 @@ import {
   deleteOperationalAuditResult,
   getOperationalAuditResults,
   createOperationalCountRule,
-  deleteOperationalCountRule,
   getOperationalCountAlerts,
   getOperationalCountRules,
   getOperationalAlertsDashboardSummary,
@@ -13,11 +12,11 @@ import {
   getOperationalUnits,
   getOperationalUsers,
   runOperationalAlertsScheduler,
-  toggleOperationalCountRule,
   updateOperationalCountRule,
   updateOperationalCountRulesBatch,
   cancelOperationalCountAlert,
   dispatchOperationalRules,
+  deleteOperationalCountRulesBatch,
 } from '@/features/operational-alerts/api';
 import {
   OperationalCountAlert,
@@ -68,6 +67,31 @@ export function useOperationalCountAdmin() {
   const [runningScheduler, setRunningScheduler] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+
+  // Regras + produtos delas (para agrupar). Chamado so quando regras mudam.
+  const refreshRules = async () => {
+    const nextRules = await getOperationalCountRules();
+    setRules(nextRules);
+    const ruleProductIds = Array.from(new Set(nextRules.map((rule) => rule.productId).filter(Boolean)));
+    try {
+      setProducts(await lookupOperationalProducts(ruleProductIds));
+    } catch {
+      setProducts([]);
+    }
+  };
+
+  // Avisos + resumo: o que muda sozinho (app iniciando/concluindo, vencimentos).
+  // Silencioso, sem spinner, usado na atualizacao automatica.
+  const refreshLive = async () => {
+    const [alertsResult, summaryResult] = await Promise.allSettled([
+      getOperationalCountAlerts(),
+      getOperationalAlertsDashboardSummary(),
+    ]);
+    if (alertsResult.status === 'fulfilled') setAlerts(alertsResult.value);
+    if (summaryResult.status === 'fulfilled') setSummary(summaryResult.value);
+    setLastUpdatedAt(new Date());
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -162,11 +186,25 @@ export function useOperationalCountAdmin() {
       setCatalogError(nextCatalogError instanceof Error ? nextCatalogError.message : 'Nao foi possivel carregar o catalogo de mercadorias.');
     }
 
+    setLastUpdatedAt(new Date());
     setLoading(false);
   };
 
   useEffect(() => {
     void loadData();
+  }, []);
+
+  // Tempo real: avisos e resumo a cada 15s (so com a aba visivel) e ao voltar para a aba.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'visible') void refreshLive();
+    };
+    const timer = window.setInterval(tick, 15000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, []);
 
   const filteredRules = useMemo(() => {
@@ -365,13 +403,13 @@ export function useOperationalCountAdmin() {
     try {
       if (input.mode === 'edit-batch') {
         const { updatedCount } = await updateOperationalCountRulesBatch(input.ruleIds, input.changes);
-        await loadData();
+        await Promise.all([refreshRules(), refreshLive()]);
         return { mode: 'product', createdCount: updatedCount, skippedCount: 0 };
       }
 
       if (input.mode === 'edit') {
         await updateOperationalCountRule(editingRuleId!, input.payload);
-        await loadData();
+        await Promise.all([refreshRules(), refreshLive()]);
         return { mode: 'product', createdCount: 1, skippedCount: 0 };
       }
 
@@ -393,7 +431,7 @@ export function useOperationalCountAdmin() {
       );
 
       await createOperationalCountRulesBatch(payloadsToCreate);
-      await loadData();
+      await Promise.all([refreshRules(), refreshLive()]);
 
       return {
         mode: input.mode,
@@ -410,29 +448,29 @@ export function useOperationalCountAdmin() {
     setSaving(true);
     try {
       await cancelOperationalCountAlert(alertId);
-      await loadData();
+      await refreshLive();
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleRule = async (ruleId: string) => {
+  // Ativar/desativar regra ou lote inteiro numa requisicao so. Desativar tira do app os
+  // avisos abertos dessas regras.
+  const setRulesActive = async (ruleIds: string[], isActive: boolean) => {
     setSaving(true);
-
     try {
-      await toggleOperationalCountRule(ruleId);
-      await loadData();
+      await updateOperationalCountRulesBatch(ruleIds, { isActive });
+      await Promise.all([refreshRules(), refreshLive()]);
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteRule = async (ruleId: string) => {
+  const deleteRules = async (ruleIds: string[]) => {
     setSaving(true);
-
     try {
-      await deleteOperationalCountRule(ruleId);
-      await loadData();
+      await deleteOperationalCountRulesBatch(ruleIds);
+      await Promise.all([refreshRules(), refreshLive()]);
     } finally {
       setSaving(false);
     }
@@ -443,7 +481,7 @@ export function useOperationalCountAdmin() {
 
     try {
       await deleteOperationalAuditResult(auditId);
-      await loadData();
+      setAuditResults((current) => current.filter((result) => result.id !== auditId));
     } finally {
       setSaving(false);
     }
@@ -453,7 +491,7 @@ export function useOperationalCountAdmin() {
     setSaving(true);
     try {
       const result = await dispatchOperationalRules(ruleIds);
-      await loadData();
+      await refreshLive();
       return result;
     } finally {
       setSaving(false);
@@ -465,7 +503,7 @@ export function useOperationalCountAdmin() {
 
     try {
       const result = await runOperationalAlertsScheduler();
-      await loadData();
+      await Promise.all([refreshRules(), refreshLive()]);
       return result;
     } finally {
       setRunningScheduler(false);
@@ -497,8 +535,9 @@ export function useOperationalCountAdmin() {
     catalogError,
     reload: loadData,
     saveRule,
-    toggleRule,
-    deleteRule,
+    setRulesActive,
+    deleteRules,
+    lastUpdatedAt,
     deleteAuditResult,
     runScheduler,
   };

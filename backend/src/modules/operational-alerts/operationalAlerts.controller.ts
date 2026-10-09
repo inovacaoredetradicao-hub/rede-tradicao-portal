@@ -49,6 +49,12 @@ export class OperationalAlertsController {
     response.status(201).json({ createdCount });
   };
 
+  deleteRulesBatch = async (request: Request, response: Response) => {
+    const { ruleIds } = z.object({ ruleIds: z.array(z.string().uuid()).min(1).max(50000) }).parse(request.body);
+    const deletedCount = await this.service.deleteRulesBatch(ruleIds);
+    response.json({ deletedCount });
+  };
+
   updateRulesBatch = async (request: Request, response: Response) => {
     const { ruleIds, changes } = updateRulesBatchSchema.parse(request.body) as {
       ruleIds: string[];

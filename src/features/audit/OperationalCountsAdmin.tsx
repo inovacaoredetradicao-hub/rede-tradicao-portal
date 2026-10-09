@@ -14,11 +14,7 @@ import { OperationalCountAlertsTable } from './OperationalCountAlertsTable';
 import { OperationalAuditResultsSection } from './OperationalAuditResultsSection';
 import { UserUnitsManager } from './UserUnitsManager';
 import { useOperationalCountAdmin } from '@/hooks/useOperationalCountAdmin';
-import {
-  getCatalogBackendBaseUrl,
-  getOperationalAlertsBackendBaseUrl,
-  searchOperationalProducts,
-} from '@/features/operational-alerts/api';
+import { searchOperationalProducts } from '@/features/operational-alerts/api';
 import {
   EditingRuleGroup,
   OperationalCountRule,
@@ -52,8 +48,9 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
     catalogError,
     reload,
     saveRule,
-    toggleRule,
-    deleteRule,
+    setRulesActive,
+    deleteRules,
+    lastUpdatedAt,
     deleteAuditResult,
     runScheduler,
     dispatchRules,
@@ -170,10 +167,14 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
     }
   };
 
-  const handleToggleRule = async (ruleIds: string[]) => {
+  const handleToggleRule = async (ruleIds: string[], nextActive: boolean) => {
     try {
-      await Promise.all(ruleIds.map((ruleId) => toggleRule(ruleId)));
-      toast.success(ruleIds.length > 1 ? 'Status do lote atualizado.' : 'Status da regra atualizado.');
+      await setRulesActive(ruleIds, nextActive);
+      toast.success(
+        nextActive
+          ? ruleIds.length > 1 ? 'Lote ativado.' : 'Regra ativada.'
+          : ruleIds.length > 1 ? 'Lote desativado. Avisos abertos dele sairam do app.' : 'Regra desativada. Avisos abertos dela sairam do app.',
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Nao foi possivel alterar a regra.');
     }
@@ -191,8 +192,8 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
   const handleDeleteRule = async (ruleIds: string[]) => {
     const confirmed = window.confirm(
       ruleIds.length > 1
-        ? 'Deseja excluir este lote de classificacao? Todos os produtos vinculados serao removidos.'
-        : 'Deseja excluir esta regra? Os alertas vinculados tambem serao removidos.',
+        ? 'Deseja excluir este lote? Todas as regras dele serao removidas e os avisos abertos saem do app.'
+        : 'Deseja excluir esta regra? Os avisos abertos dela saem do app.',
     );
 
     if (!confirmed) {
@@ -200,8 +201,8 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
     }
 
     try {
-      await Promise.all(ruleIds.map((ruleId) => deleteRule(ruleId)));
-      toast.success(ruleIds.length > 1 ? 'Lote de classificacao excluido com sucesso.' : 'Regra excluida com sucesso.');
+      await deleteRules(ruleIds);
+      toast.success(ruleIds.length > 1 ? 'Lote excluido. Avisos abertos dele sairam do app.' : 'Regra excluida. Avisos abertos dela sairam do app.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Nao foi possivel excluir a regra.');
     }
@@ -236,11 +237,9 @@ export const OperationalCountsAdmin: React.FC<OperationalCountsAdminProps> = ({ 
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Badge variant="outline" className="px-3 py-1">
-            Catalogo: {getCatalogBackendBaseUrl()}
-          </Badge>
-          <Badge variant="outline" className="px-3 py-1">
-            Disparos: {getOperationalAlertsBackendBaseUrl()}
+          <Badge variant="outline" className="gap-1.5 px-3 py-1" title="Avisos e resumo atualizam sozinhos a cada 15 segundos">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+            Ao vivo{lastUpdatedAt ? ` · ${lastUpdatedAt.toLocaleTimeString('pt-BR')}` : ''}
           </Badge>
           <Button className="gap-2" onClick={handleOpenCreate}>
             <Play className="h-4 w-4" />

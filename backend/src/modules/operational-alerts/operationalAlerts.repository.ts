@@ -249,6 +249,7 @@ export class OperationalAlertsRepository {
           ON units.id::text = portal_audits.unit_id
         ${whereClause}
         ORDER BY portal_audits.finished_at DESC NULLS LAST, portal_audits.received_at DESC NULLS LAST
+        LIMIT 500
       `,
       values,
     );
@@ -531,6 +532,31 @@ export class OperationalAlertsRepository {
     return result.rows[0] ?? null;
   }
 
+  // Tira do app os avisos abertos que contem estas regras (regra desativada/excluida
+  // nao pode continuar aparecendo para a filial). Precisa rodar ANTES de excluir a regra,
+  // porque a exclusao zera operational_alert_batch_items.rule_id.
+  async cancelOpenBatchesForRules(ruleIds: string[]) {
+    const result = await query(
+      `
+        UPDATE operational_alert_batches
+        SET status = 'cancelado', updated_at = NOW()
+        WHERE status IN ('pendente', 'em_andamento')
+          AND EXISTS (
+            SELECT 1 FROM operational_alert_batch_items items
+            WHERE items.batch_id = operational_alert_batches.id
+              AND items.rule_id = ANY($1::uuid[])
+          )
+      `,
+      [ruleIds],
+    );
+    return result.rowCount ?? 0;
+  }
+
+  async deleteRulesBatch(ruleIds: string[]) {
+    const result = await query(`DELETE FROM operational_count_rules WHERE id = ANY($1::uuid[])`, [ruleIds]);
+    return result.rowCount ?? 0;
+  }
+
   async deleteRule(ruleId: string) {
     const result = await query<OperationalCountRule>(
       `
@@ -734,6 +760,10 @@ export class OperationalAlertsRepository {
       index += 1;
     }
 
+    conditions.push(
+      `(operational_alert_batches.status IN ('pendente', 'em_andamento') OR operational_alert_batches.scheduled_at >= NOW() - INTERVAL '30 days')`,
+    );
+
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const result = await query<Omit<OperationalAlertBatch, 'items' | 'title' | 'description'>>(
       `
@@ -741,6 +771,7 @@ export class OperationalAlertsRepository {
         FROM operational_alert_batches
         ${whereClause}
         ORDER BY operational_alert_batches.scheduled_at DESC
+        LIMIT 2000
       `,
       values,
     );

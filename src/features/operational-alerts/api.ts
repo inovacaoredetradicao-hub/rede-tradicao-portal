@@ -232,6 +232,14 @@ export async function updateOperationalCountRulesBatch(
   });
 }
 
+/** Exclui regras/lote de uma vez (tambem tira do app os avisos abertos delas). */
+export async function deleteOperationalCountRulesBatch(ruleIds: string[]) {
+  return requestOperationalJson<{ deletedCount: number }>(`${MODULE_PREFIX}/rules/batch`, {
+    method: 'DELETE',
+    body: JSON.stringify({ ruleIds }),
+  });
+}
+
 export async function updateOperationalCountRule(ruleId: string, payload: Partial<OperationalRulePayload>) {
   return requestOperationalJson<OperationalCountRule>(`${MODULE_PREFIX}/rules/${ruleId}`, {
     method: 'PATCH',
