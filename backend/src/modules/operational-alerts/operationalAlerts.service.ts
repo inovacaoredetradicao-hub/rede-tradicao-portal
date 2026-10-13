@@ -388,10 +388,11 @@ export class OperationalAlertsService {
 
     rules.forEach((rule) => {
       const isCustomGroup = !!rule.groupId;
+      const groupLabel = rule.groupLabel?.trim() || null;
       const hasClassification = !isCustomGroup && !!rule.classificationLabel?.trim();
-      const type: OperationalAlertBatchType = hasClassification ? 'classification' : 'product';
+      const type: OperationalAlertBatchType = hasClassification || (isCustomGroup && groupLabel) ? 'classification' : 'product';
       const classificationLabel = isCustomGroup
-        ? rule.productName
+        ? groupLabel ?? rule.productName
         : hasClassification
           ? rule.classificationLabel!.trim()
           : rule.productName;
@@ -432,7 +433,8 @@ export class OperationalAlertsService {
     });
 
     return Array.from(groups.values()).map((group) => {
-      if (group.isCustomGroup && group.rules.length > 1) {
+      // Lote com nome (disparo por classificacao/grupo) mantem o nome, ex.: "CONVENIENCIA / BEBIDAS".
+      if (group.isCustomGroup && group.rules.length > 1 && !group.rules[0].groupLabel?.trim()) {
         return {
           ...group,
           classificationLabel: buildCustomGroupLabel(group.rules.map((rule) => rule.productName)),

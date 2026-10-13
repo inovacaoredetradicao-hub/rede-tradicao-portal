@@ -33,6 +33,7 @@ const ruleSelect = `
   operational_count_rules.responsible_user_name AS "responsibleUserName",
   COALESCE(NULLIF(products.classification, ''), NULLIF(products.stock_type, '')) AS "classificationLabel",
   operational_count_rules.group_id AS "groupId",
+  operational_count_rules.group_label AS "groupLabel",
   operational_count_rules.created_at AS "createdAt",
   operational_count_rules.updated_at AS "updatedAt"
 `;
@@ -361,9 +362,10 @@ export class OperationalAlertsRepository {
           end_date,
           responsible_user_id,
           responsible_user_name,
-          group_id
+          group_id,
+          group_label
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
         RETURNING
           id,
           product_id AS "productId",
@@ -380,6 +382,7 @@ export class OperationalAlertsRepository {
           responsible_user_name AS "responsibleUserName",
           NULL::text AS "classificationLabel",
           group_id AS "groupId",
+          group_label AS "groupLabel",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
       `,
@@ -397,6 +400,7 @@ export class OperationalAlertsRepository {
         input.responsibleUserId ?? null,
         input.responsibleUserName ?? null,
         input.groupId ?? null,
+        input.groupLabel ?? null,
       ],
     );
 
@@ -419,12 +423,12 @@ export class OperationalAlertsRepository {
             INSERT INTO operational_count_rules (
               product_id, barcode, product_name, unit_id, unit_name, frequency,
               execution_deadline_minutes, is_active, start_date, end_date,
-              responsible_user_id, responsible_user_name, group_id
+              responsible_user_id, responsible_user_name, group_id, group_label
             )
             SELECT * FROM unnest(
               $1::uuid[], $2::text[], $3::text[], $4::uuid[], $5::text[], $6::text[],
               $7::int[], $8::bool[], $9::date[], $10::date[],
-              $11::uuid[], $12::text[], $13::uuid[]
+              $11::uuid[], $12::text[], $13::uuid[], $14::text[]
             )
           `,
           [
@@ -432,6 +436,7 @@ export class OperationalAlertsRepository {
             column('unitName'), column('frequency'), column('executionDeadlineMinutes'),
             column('isActive'), column('startDate'), column('endDate'),
             column('responsibleUserId'), column('responsibleUserName'), column('groupId'),
+            column('groupLabel'),
           ],
         );
         created += result.rowCount ?? 0;
@@ -497,6 +502,7 @@ export class OperationalAlertsRepository {
       responsible_user_id: input.responsibleUserId,
       responsible_user_name: input.responsibleUserName,
       group_id: input.groupId,
+      group_label: input.groupLabel,
     };
 
     Object.entries(mapping).forEach(([column, value]) => {
@@ -533,6 +539,7 @@ export class OperationalAlertsRepository {
           responsible_user_name AS "responsibleUserName",
           NULL::text AS "classificationLabel",
           group_id AS "groupId",
+          group_label AS "groupLabel",
           created_at AS "createdAt",
           updated_at AS "updatedAt"
       `,
@@ -866,6 +873,10 @@ export class OperationalAlertsRepository {
 
     const batches = await this.attachBatchItems(result.rows);
     return batches[0] ?? null;
+  }
+
+  async ensureGroupLabelColumn() {
+    await query(`ALTER TABLE operational_count_rules ADD COLUMN IF NOT EXISTS group_label TEXT NULL`);
   }
 
   // Garante o status 'cancelado' em bancos criados antes dele existir.

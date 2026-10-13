@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import {
   getOperationalClassifications,
+  getProductCategoryPaths,
   getProductsByClassification,
   getUsersByUnit,
   searchOperationalProducts,
@@ -22,6 +23,7 @@ import {
 import {
   CountFrequency,
   EditingRuleGroup,
+  ProductCategoryPath,
   OperationalClassificationOption,
   OperationalCountRule,
   OperationalProductOption,
@@ -230,6 +232,9 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
   const [loadingUnitClassifications, setLoadingUnitClassifications] = useState(false);
   // A lista completa da classificacao ja abre aberta; o link so serve para recolher.
   const [showAllClassificationProducts, setShowAllClassificationProducts] = useState(true);
+  // Filtro em cascata abaixo da classificacao: ["BEBIDAS"], ["BEBIDAS", "REFRIGERANTES"]...
+  const [categoryPaths, setCategoryPaths] = useState<ProductCategoryPath[]>([]);
+  const [subPath, setSubPath] = useState<string[]>([]);
 
   useEffect(() => {
     if (!form.unitId) {
@@ -270,7 +275,57 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
 
   useEffect(() => {
     setShowAllClassificationProducts(true);
+  }, [form.classificationKey, form.unitId, subPath.join('|')]);
+
+  // Trocou filial ou classificacao: volta o filtro para "todos" no nivel de baixo.
+  useEffect(() => {
+    setSubPath([]);
   }, [form.classificationKey, form.unitId]);
+
+  // Arvore de grupos/subgrupos (da filial, quando escolhida). Poucas centenas de linhas.
+  useEffect(() => {
+    if (form.targetMode !== 'classification') return;
+    let cancelled = false;
+    getProductCategoryPaths(form.unitId || undefined)
+      .then((rows) => {
+        if (!cancelled) setCategoryPaths(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCategoryPaths([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.unitId, form.targetMode]);
+
+  const classificationPaths = useMemo(
+    () => (selectedClassification ? categoryPaths.filter((row) => row.label === selectedClassification.label) : []),
+    [categoryPaths, selectedClassification],
+  );
+
+  // Para cada nivel ja escolhido + o proximo: opcoes com a quantidade de produtos.
+  const cascadeLevels = useMemo(() => {
+    const levels: { options: { value: string; count: number }[]; selected: string }[] = [];
+    for (let depth = 0; depth <= subPath.length; depth += 1) {
+      const counts = new Map<string, number>();
+      for (const row of classificationPaths) {
+        const matchesPrefix = subPath.slice(0, depth).every((segment, index) => row.segments[index] === segment);
+        if (!matchesPrefix || row.segments.length <= depth) continue;
+        const value = row.segments[depth];
+        counts.set(value, (counts.get(value) ?? 0) + row.productCount);
+      }
+      if (counts.size === 0) break;
+      levels.push({
+        options: Array.from(counts.entries())
+          .map(([value, count]) => ({ value, count }))
+          .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),
+        selected: subPath[depth] ?? '',
+      });
+    }
+    return levels;
+  }, [classificationPaths, subPath]);
+
+  const selectedLotLabel = selectedClassification ? [selectedClassification.label, ...subPath].join(' / ') : '';
 
   useEffect(() => {
     if (!selectedClassification) {
@@ -280,7 +335,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
 
     let cancelled = false;
     setLoadingClassification(true);
-    getProductsByClassification(selectedClassification.label, form.unitId || undefined)
+    getProductsByClassification(selectedClassification.label, form.unitId || undefined, subPath.join(' / ') || undefined)
       .then((result) => {
         if (!cancelled) setClassificationProducts(result);
       })
@@ -294,7 +349,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
     return () => {
       cancelled = true;
     };
-  }, [selectedClassification, form.unitId]);
+  }, [selectedClassification, form.unitId, subPath.join('|')]);
 
   const previewClassificationProducts = classificationProducts.slice(0, 8);
 
@@ -448,6 +503,9 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
         return;
       }
 
+      // Lote proprio (groupId) com o nome completo: disparos de grupos diferentes da mesma
+      // classificacao (ex.: BEBIDAS e SNACKS) nao se misturam no mesmo aviso.
+      const groupId = generateGroupId();
       const payloads = classificationProducts.flatMap((product) =>
         selectedUsers.map((user) =>
           buildBasePayload({
@@ -456,12 +514,14 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
             productName: product.name,
             responsibleUserId: user.id,
             responsibleUserName: user.name,
+            groupId,
+            groupLabel: selectedLotLabel,
           }),
         ),
       );
 
       await onSubmit(
-        { mode: 'classification', classificationKey: selectedClassification.key, classificationLabel: selectedClassification.label, payloads },
+        { mode: 'classification', classificationKey: selectedClassification.key, classificationLabel: selectedLotLabel, payloads },
         null,
       );
       onOpenChange(false);
@@ -816,23 +876,50 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
                   )}
                 </div>
 
+                {selectedClassification &&
+                  cascadeLevels.map((level, depth) => (
+                    <div key={depth} className="space-y-2">
+                      <Label htmlFor={`cascade-${depth}`}>
+                        {depth === 0 ? 'Grupo' : depth === 1 ? 'Subgrupo' : `Nivel ${depth + 2}`}{' '}
+                        <span className="font-normal text-muted-foreground">(opcional)</span>
+                      </Label>
+                      <select
+                        id={`cascade-${depth}`}
+                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={level.selected}
+                        onChange={(event) =>
+                          setSubPath((current) =>
+                            event.target.value ? [...current.slice(0, depth), event.target.value] : current.slice(0, depth),
+                          )
+                        }
+                      >
+                        <option value="">Todos</option>
+                        {level.options.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.value} ({option.count} produtos)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+
                 <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="font-semibold text-foreground">
-                        {selectedClassification ? selectedClassification.label : 'Nenhuma classificacao selecionada'}
+                        {selectedClassification ? selectedLotLabel : 'Nenhuma classificacao selecionada'}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {!selectedClassification
                           ? 'Selecione uma classificacao para visualizar o lote de produtos.'
                           : loadingClassification
                             ? 'Carregando produtos da classificacao...'
-                            : `${selectedClassification.productCount} produto(s) x ${form.selectedUserIds.length} usuario(s) selecionado(s).`}
+                            : `${classificationProducts.length} produto(s) x ${form.selectedUserIds.length} usuario(s) selecionado(s).`}
                       </p>
                     </div>
                     {selectedClassification && (
                       <div className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
-                        {selectedClassification.productCount} itens
+                        {classificationProducts.length} itens
                       </div>
                     )}
                   </div>

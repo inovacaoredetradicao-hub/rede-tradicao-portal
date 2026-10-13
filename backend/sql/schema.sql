@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS operational_count_rules (
 -- group_id agrupa N regras (produtos arbitrarios, ex.: Doritos + Baton + Coca-Cola)
 -- criadas juntas num unico disparo, para que o scheduler as junte em 1 lote/alerta so.
 ALTER TABLE operational_count_rules ADD COLUMN IF NOT EXISTS group_id UUID NULL;
+-- group_label: nome do lote (ex.: "CONVENIENCIA / BEBIDAS") em disparos por classificacao/grupo.
+ALTER TABLE operational_count_rules ADD COLUMN IF NOT EXISTS group_label TEXT NULL;
 
 -- Permite disparo "unico" (nao recorrente) alem das frequencias existentes.
 DO $$

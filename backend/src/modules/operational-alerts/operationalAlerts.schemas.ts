@@ -16,6 +16,7 @@ export const createRuleSchema = z.object({
   responsibleUserId: z.string().nullable().optional(),
   responsibleUserName: z.string().nullable().optional(),
   groupId: z.string().uuid().nullable().optional(),
+  groupLabel: z.string().trim().max(300).nullable().optional(),
 });
 
 export const updateRuleSchema = createRuleSchema.partial();

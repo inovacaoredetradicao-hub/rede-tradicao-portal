@@ -270,12 +270,15 @@ export function useOperationalCountAdmin() {
 
       if (firstRule.groupId && groupRules.length > 1) {
         const names = groupRules.map((rule) => rule.productName);
-        const title = names.length <= 3 ? names.join(', ') : `${names.slice(0, 3).join(', ')} e mais ${names.length - 3}`;
+        // Lote com nome = disparo por classificacao/grupo (ex.: "CONVENIENCIA / BEBIDAS").
+        const groupLabel = firstRule.groupLabel?.trim();
+        const title =
+          groupLabel || (names.length <= 3 ? names.join(', ') : `${names.slice(0, 3).join(', ')} e mais ${names.length - 3}`);
 
         return [
           {
             id: key,
-            type: 'product' as const,
+            type: groupLabel ? ('classification' as const) : ('product' as const),
             title,
             subtitle: `${groupRules.length} produtos no mesmo disparo`,
             unitName: firstRule.unitName,

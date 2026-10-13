@@ -11,6 +11,7 @@ import {
   OperationalUserOption,
   OperationalClassificationOption,
   OperationalRuleBatchEditPayload,
+  ProductCategoryPath,
 } from './types';
 
 const DEFAULT_BACKEND_BASE_URL = 'http://localhost:4001';
@@ -347,8 +348,23 @@ export async function getOperationalClassifications(unitId?: string): Promise<Op
   }));
 }
 
-export async function getProductsByClassification(label: string, unitId?: string) {
-  const unitQuery = unitId ? `&unitId=${encodeURIComponent(unitId)}` : '';
+/** Arvore classificacao > grupo > subgrupo (com filial: so produtos com estoque nela). */
+export async function getProductCategoryPaths(unitId?: string): Promise<ProductCategoryPath[]> {
+  const query = unitId ? `?unitId=${encodeURIComponent(unitId)}` : '';
+  const rows = await requestCatalogJson<{ label: string; sub_group: string | null; product_count: number }[]>(
+    `/products/category-paths${query}`,
+  );
+  return rows.map((row) => ({
+    label: row.label,
+    segments: row.sub_group ? row.sub_group.split(' / ').map((part) => part.trim()).filter(Boolean) : [],
+    productCount: Number(row.product_count ?? 0),
+  }));
+}
+
+/** subPath: niveis abaixo da classificacao ("BEBIDAS" ou "BEBIDAS / REFRIGERANTES"). */
+export async function getProductsByClassification(label: string, unitId?: string, subPath?: string) {
+  const unitQuery =
+    (unitId ? `&unitId=${encodeURIComponent(unitId)}` : '') + (subPath ? `&subPath=${encodeURIComponent(subPath)}` : '');
   const products = await requestCatalogJson<any[]>(`/products/by-classification?label=${encodeURIComponent(label)}${unitQuery}`);
   return products.map(normalizeProduct).filter((product) => product.id && product.name);
 }

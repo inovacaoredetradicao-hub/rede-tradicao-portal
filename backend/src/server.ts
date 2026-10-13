@@ -7,6 +7,7 @@ const { app, service } = createApp();
 const scheduler = new OperationalAlertsScheduler(service);
 
 await new OperationalAlertsRepository().ensureCancelledStatus();
+await new OperationalAlertsRepository().ensureGroupLabelColumn();
 
 app.listen(env.PORT, env.HOST, () => {
   const displayHost = env.HOST === '0.0.0.0' ? 'localhost' : env.HOST;

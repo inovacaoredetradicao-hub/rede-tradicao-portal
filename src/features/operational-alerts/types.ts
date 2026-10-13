@@ -17,6 +17,8 @@ export interface OperationalCountRule {
   responsibleUserId: string | null;
   responsibleUserName: string | null;
   groupId?: string | null;
+  /** Nome do lote em disparos por classificacao/grupo (ex.: "CONVENIENCIA / BEBIDAS"). */
+  groupLabel?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,6 +70,8 @@ export interface OperationalRulePayload {
   responsibleUserId: string | null;
   responsibleUserName: string | null;
   groupId?: string | null;
+  /** Nome do lote em disparos por classificacao/grupo (ex.: "CONVENIENCIA / BEBIDAS"). */
+  groupLabel?: string | null;
 }
 
 export interface OperationalRuleBatchPayload {
@@ -129,6 +133,14 @@ export interface OperationalProductOption {
   displayLabel: string;
   /** Estoque na filial escolhida (ou total), quando a busca pede. */
   stockTotal?: number;
+}
+
+/** Uma combinacao classificacao + subgrupo com a quantidade de produtos (arvore do filtro). */
+export interface ProductCategoryPath {
+  label: string;
+  /** Niveis abaixo da classificacao, ex.: ["BEBIDAS", "REFRIGERANTES"]. */
+  segments: string[];
+  productCount: number;
 }
 
 export interface OperationalClassificationOption {

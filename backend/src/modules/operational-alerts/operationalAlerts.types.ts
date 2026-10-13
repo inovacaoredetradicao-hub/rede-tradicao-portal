@@ -19,6 +19,8 @@ export interface OperationalCountRule {
   responsibleUserName: string | null;
   classificationLabel?: string | null;
   groupId?: string | null;
+  /** Nome do lote (ex.: "CONVENIENCIA / BEBIDAS"), para disparos por classificacao/grupo. */
+  groupLabel?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -80,6 +82,8 @@ export interface CreateRuleInput {
   responsibleUserId?: string | null;
   responsibleUserName?: string | null;
   groupId?: string | null;
+  /** Nome do lote (ex.: "CONVENIENCIA / BEBIDAS"), para disparos por classificacao/grupo. */
+  groupLabel?: string | null;
 }
 
 export interface UpdateRuleInput extends Partial<CreateRuleInput> {}
