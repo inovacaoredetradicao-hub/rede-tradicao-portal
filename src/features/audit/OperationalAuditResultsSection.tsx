@@ -18,6 +18,20 @@ interface OperationalAuditResultsSectionProps {
   onDelete: (auditId: string) => void | Promise<void>;
 }
 
+// Mesmo padrao da tabela de regras: um produto -> nome; lote de classificacao/grupo ->
+// nome do lote (ex.: "CONVENIENCIA / BEBIDAS"); varios produtos avulsos -> quantidade.
+function describeAudit(result: OperationalAuditResult) {
+  const count = Number(result.totalItems ?? 0);
+  if (count <= 1) {
+    return { title: result.productName || 'Nao identificado', detail: result.unitName || result.unitId || '-' };
+  }
+  const where = result.unitName || result.unitId || '-';
+  if (result.alertType === 'classification' && result.alertLabel) {
+    return { title: result.alertLabel, detail: `Classificacao · ${count} produtos · ${where}` };
+  }
+  return { title: `Contagem de ${count} produtos`, detail: `Produtos especificos · ${where}` };
+}
+
 function formatPercent(value: number | null) {
   if (value === null || Number.isNaN(value)) {
     return '-';
@@ -132,7 +146,7 @@ export const OperationalAuditResultsSection: React.FC<OperationalAuditResultsSec
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="pl-6">Produto</TableHead>
+                  <TableHead className="pl-6">Contagem</TableHead>
                   <TableHead>Auditor</TableHead>
                   <TableHead>Quando</TableHead>
                   <TableHead>Status</TableHead>
@@ -143,10 +157,12 @@ export const OperationalAuditResultsSection: React.FC<OperationalAuditResultsSec
               <TableBody>
                 {results.map((result) => (
                   <TableRow key={result.id}>
-                    <TableCell className="pl-6">
-                      <div className="space-y-1">
-                        <p className="font-medium text-foreground">{result.productName || 'Nao identificado'}</p>
-                        <p className="text-xs text-muted-foreground">{result.unitName || result.unitId || '-'}</p>
+                    <TableCell className="max-w-72 pl-6">
+                      <div className="space-y-0.5">
+                        <p className="truncate font-medium text-foreground" title={describeAudit(result).title}>
+                          {describeAudit(result).title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{describeAudit(result).detail}</p>
                       </div>
                     </TableCell>
                     <TableCell>{result.sellerName || '-'}</TableCell>
@@ -195,7 +211,7 @@ export const OperationalAuditResultsSection: React.FC<OperationalAuditResultsSec
           {selectedResult && (
             <div className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Produto</p><p className="mt-1 font-semibold">{selectedResult.productName || '-'}</p></CardContent></Card>
+                <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Contagem</p><p className="mt-1 font-semibold">{describeAudit(selectedResult).title}</p></CardContent></Card>
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Filial</p><p className="mt-1 font-semibold">{selectedResult.unitName || selectedResult.unitId || '-'}</p></CardContent></Card>
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Auditor</p><p className="mt-1 font-semibold">{selectedResult.sellerName || '-'}</p></CardContent></Card>
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Status</p><p className="mt-1 font-semibold">{selectedResult.resultStatus}</p></CardContent></Card>

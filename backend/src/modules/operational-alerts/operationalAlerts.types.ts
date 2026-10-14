@@ -123,6 +123,8 @@ export interface OperationalAuditResult {
   totalDivergences: number;
   finishedAt: string | null;
   payload: unknown;
+  alertType: string | null;
+  alertLabel: string | null;
 }
 
 export interface AuditResultFilters {

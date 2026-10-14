@@ -104,7 +104,11 @@ const auditResultSelect = `
   COALESCE(portal_audits.total_items, 0) AS "totalItems",
   COALESCE(portal_audits.total_divergences, 0) AS "totalDivergences",
   portal_audits.finished_at::text AS "finishedAt",
-  portal_audits.payload AS payload
+  -- Lote do aviso que originou a contagem (para o resumo "CONVENIENCIA / BEBIDAS").
+  operational_alert_batches.type AS "alertType",
+  operational_alert_batches.classification_label AS "alertLabel",
+  -- PDF e assinatura (imagens em base64, ~85% do tamanho) ficam de fora: o PDF tem rota propria.
+  (portal_audits.payload - 'reportPdfBase64' - 'auditorSignature') AS payload
 `;
 
 function buildRuleWhereClause(filters: RuleFilters) {

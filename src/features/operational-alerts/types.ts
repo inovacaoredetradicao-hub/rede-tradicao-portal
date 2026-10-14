@@ -223,6 +223,9 @@ export interface OperationalAuditResult {
   totalDivergences: number;
   finishedAt: string | null;
   payload: unknown;
+  /** Tipo e nome do lote do aviso que originou a contagem (quando veio de um aviso). */
+  alertType?: 'product' | 'classification' | null;
+  alertLabel?: string | null;
 }
 
 export interface OperationalAuditResultFilters {
