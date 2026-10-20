@@ -14,12 +14,23 @@ function formatPercentage(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
+// Curva ABC sobre a nota media dos checklists da filial:
+// A = acima de 90% | B = de 80% a 90% | C = abaixo de 80%.
+function abcCurve(score: number) {
+  if (score > 90) return { letter: 'A', tone: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
+  if (score >= 80) return { letter: 'B', tone: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
+  return { letter: 'C', tone: 'bg-rose-500/15 text-rose-600 border-rose-500/30' };
+}
+
 export const OperationalAuditUnitTable: React.FC<OperationalAuditUnitTableProps> = ({ loading, rows }) => {
   return (
     <Card className="border-border/60 shadow-sm">
       <CardHeader>
         <CardTitle className="text-xl">Visão Por Filial</CardTitle>
-        <CardDescription>Indicadores consolidados por filial com base no backend do app de auditoria.</CardDescription>
+        <CardDescription>
+          Indicadores consolidados por filial. Curva ABC pela nota media dos checklists: A acima de 90%, B de 80% a 90%, C
+          abaixo de 80%.
+        </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
@@ -47,7 +58,9 @@ export const OperationalAuditUnitTable: React.FC<OperationalAuditUnitTableProps>
                 <TableHead>Checklists</TableHead>
                 <TableHead>Devoluções</TableHead>
                 <TableHead>Acuracidade média</TableHead>
-                <TableHead>Score médio</TableHead>
+                <TableHead title="A: acima de 90% · B: de 80% a 90% · C: abaixo de 80% (nota media dos checklists)">
+                  Curva ABC
+                </TableHead>
                 <TableHead className="pr-6">Itens devolvidos</TableHead>
               </TableRow>
             </TableHeader>
@@ -59,7 +72,21 @@ export const OperationalAuditUnitTable: React.FC<OperationalAuditUnitTableProps>
                   <TableCell>{row.totalChecklists}</TableCell>
                   <TableCell>{row.totalReturns}</TableCell>
                   <TableCell>{formatPercentage(row.avgAuditAccuracy)}</TableCell>
-                  <TableCell>{formatPercentage(row.avgChecklistScore)}</TableCell>
+                  <TableCell>
+                    {row.totalChecklists > 0 ? (
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-sm font-bold ${abcCurve(row.avgChecklistScore).tone}`}
+                        title={`Nota media dos checklists: ${formatPercentage(row.avgChecklistScore)}`}
+                      >
+                        {abcCurve(row.avgChecklistScore).letter}
+                        <span className="text-xs font-normal">{formatPercentage(row.avgChecklistScore)}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground" title="Filial sem checklist no periodo">
+                        —
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="pr-6">{row.totalReturnedItems}</TableCell>
                 </TableRow>
               ))}
