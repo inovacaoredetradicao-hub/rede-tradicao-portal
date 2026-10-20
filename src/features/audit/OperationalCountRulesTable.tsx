@@ -68,6 +68,7 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
               <TableRow>
                 <TableHead className="pl-6">Disparo</TableHead>
                 <TableHead>Filial</TableHead>
+                <TableHead>Cadastrada em</TableHead>
                 <TableHead>Frequencia</TableHead>
                 <TableHead>Prazo</TableHead>
                 <TableHead>Responsavel</TableHead>
@@ -89,6 +90,11 @@ export const OperationalCountRulesTable: React.FC<OperationalCountRulesTableProp
                     </div>
                   </TableCell>
                   <TableCell className="max-w-52 truncate">{rule.unitName}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                    {rule.createdAt
+                      ? new Date(rule.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                      : '-'}
+                  </TableCell>
                   <TableCell>{formatFrequency(rule.frequency)}</TableCell>
                   <TableCell>{rule.executionDeadlineMinutes} min</TableCell>
                   <TableCell>{rule.responsibleUserName || 'Nao definido'}</TableCell>

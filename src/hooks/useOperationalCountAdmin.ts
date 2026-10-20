@@ -50,6 +50,14 @@ const DEFAULT_AUDIT_RESULT_FILTERS: OperationalAuditResultFilters = {
   dateTo: '',
 };
 
+// Data de cadastro de um lote = a da regra mais antiga dele (todas sao criadas juntas).
+function earliestCreatedAt(rules: OperationalCountRule[]) {
+  return rules.reduce<string | undefined>(
+    (earliest, rule) => (!earliest || (rule.createdAt && rule.createdAt < earliest) ? rule.createdAt : earliest),
+    undefined,
+  );
+}
+
 export function useOperationalCountAdmin() {
   const [rules, setRules] = useState<OperationalCountRule[]>([]);
   const [alerts, setAlerts] = useState<OperationalCountAlert[]>([]);
@@ -241,6 +249,7 @@ export function useOperationalCountAdmin() {
           productCount: 1,
           startDate: rule.startDate,
           endDate: rule.endDate,
+          createdAt: rule.createdAt,
           representativeRule: rule,
           searchText: `${rule.productName} ${rule.barcode} ${rule.unitName}`.toLowerCase(),
         });
@@ -291,6 +300,7 @@ export function useOperationalCountAdmin() {
             productCount: groupRules.length,
             startDate: firstRule.startDate,
             endDate: firstRule.endDate,
+            createdAt: earliestCreatedAt(groupRules),
             representativeRule: firstRule,
             responsibleCount: new Set(groupRules.map((rule) => rule.responsibleUserId ?? '')).size,
             products: groupRules.map((rule) => ({ id: rule.productId, name: rule.productName, barcode: rule.barcode })),
@@ -315,6 +325,7 @@ export function useOperationalCountAdmin() {
           productCount: 1,
           startDate: rule.startDate,
           endDate: rule.endDate,
+          createdAt: rule.createdAt,
           representativeRule: rule,
           searchText: `${rule.productName} ${rule.barcode} ${rule.unitName}`.toLowerCase(),
         }));
@@ -336,6 +347,7 @@ export function useOperationalCountAdmin() {
           productCount: groupRules.length,
           startDate: firstRule.startDate,
           endDate: firstRule.endDate,
+          createdAt: earliestCreatedAt(groupRules),
           representativeRule: firstRule,
           responsibleCount: new Set(groupRules.map((rule) => rule.responsibleUserId ?? '')).size,
           products: groupRules.map((rule) => ({ id: rule.productId, name: rule.productName, barcode: rule.barcode })),
@@ -356,7 +368,11 @@ export function useOperationalCountAdmin() {
 
         return matchesProduct && matchesUnit && matchesStatus;
       })
-      .sort((left, right) => left.title.localeCompare(right.title));
+      // Mais nova primeiro (data de cadastro); empate pelo nome.
+      .sort(
+        (left, right) =>
+          (right.createdAt ?? '').localeCompare(left.createdAt ?? '') || left.title.localeCompare(right.title),
+      );
   }, [filters, products, rules]);
 
   const filteredAlerts = useMemo(() => {

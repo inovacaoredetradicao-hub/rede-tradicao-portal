@@ -168,6 +168,8 @@ export interface OperationalRuleListItem {
   representativeRule?: OperationalCountRule;
   searchText: string;
   responsibleCount?: number;
+  /** Quando a regra (ou a primeira do lote) foi cadastrada. */
+  createdAt?: string;
   /** Produtos do lote (para listar dentro do "Editar"; a tabela nao mostra). */
   products?: RuleGroupProduct[];
 }
