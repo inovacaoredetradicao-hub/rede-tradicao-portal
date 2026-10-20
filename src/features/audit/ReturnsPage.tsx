@@ -6,13 +6,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { getPortalReturnDetail, getPortalReturns } from '@/services/portalAuditApi';
+import { getPortalAuditApiBaseUrl, getPortalReturnDetail, getPortalReturns } from '@/services/portalAuditApi';
+import { withTokenQuery } from '@/lib/session';
 import { PortalReturnDetail, PortalReturnSummary } from '@/types';
 
+// "vencidos_ou_avarias" e o motivo antigo, de antes de separar avariados e vencidos.
 const REASON_LABELS: Record<string, string> = {
-  vencidos_ou_avarias: 'Vencidos ou avarias',
+  avariados: 'Avariados',
+  vencidos: 'Vencidos',
   excesso_mercadoria: 'Excesso de mercadoria',
+  vencidos_ou_avarias: 'Vencidos ou avarias (antigo)',
 };
+
+const REASON_FILTERS = ['avariados', 'vencidos', 'excesso_mercadoria', 'vencidos_ou_avarias'] as const;
+
+// Foto de um item: o app envia junto com a devolucao; o servidor entrega por esta rota.
+function returnPhotoUrl(sourceSessionId: string, itemId: string) {
+  return withTokenQuery(
+    `${getPortalAuditApiBaseUrl()}/portal/returns/${encodeURIComponent(sourceSessionId)}/items/${encodeURIComponent(itemId)}/photo`,
+  );
+}
 
 function formatDateTime(value: string | null) {
   if (!value) return '-';
@@ -26,6 +39,8 @@ export const ReturnsPage: React.FC = () => {
   const [sellerSearch, setSellerSearch] = useState('');
   const [selected, setSelected] = useState<PortalReturnDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [reasonFilter, setReasonFilter] = useState<string>('todos');
+  const [zoomPhoto, setZoomPhoto] = useState<{ url: string; name: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -46,16 +61,26 @@ export const ReturnsPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     const search = sellerSearch.trim().toLowerCase();
-    if (!search) return returns;
-    return returns.filter((item) => item.seller_name.toLowerCase().includes(search));
-  }, [returns, sellerSearch]);
+    return returns.filter(
+      (item) =>
+        (reasonFilter === 'todos' || item.reason === reasonFilter) &&
+        (!search || item.seller_name.toLowerCase().includes(search)),
+    );
+  }, [returns, sellerSearch, reasonFilter]);
 
-  const summary = useMemo(() => {
-    const total = returns.length;
-    const totalItems = returns.reduce((sum, item) => sum + item.total_items, 0);
-    const totalQuantity = returns.reduce((sum, item) => sum + Number(item.total_quantity), 0);
-    return { total, totalItems, totalQuantity };
+  const countByReason = useMemo(() => {
+    const counts = new Map<string, number>();
+    returns.forEach((item) => counts.set(item.reason, (counts.get(item.reason) ?? 0) + 1));
+    return counts;
   }, [returns]);
+
+  // Cartoes seguem o filtro de motivo (ex.: so Avariados).
+  const summary = useMemo(() => {
+    const total = filtered.length;
+    const totalItems = filtered.reduce((sum, item) => sum + item.total_items, 0);
+    const totalQuantity = filtered.reduce((sum, item) => sum + Number(item.total_quantity), 0);
+    return { total, totalItems, totalQuantity };
+  }, [filtered]);
 
   const openDetail = async (sourceSessionId: string) => {
     setLoadingDetail(true);
@@ -96,7 +121,23 @@ export const ReturnsPage: React.FC = () => {
       </div>
 
       <Card className="border-border/60 shadow-sm">
-        <CardContent className="p-5">
+        <CardContent className="space-y-3 p-5">
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant={reasonFilter === 'todos' ? 'default' : 'outline'} onClick={() => setReasonFilter('todos')}>
+              Todos ({returns.length})
+            </Button>
+            {REASON_FILTERS.filter((reason) => reason !== 'vencidos_ou_avarias' || countByReason.has(reason)).map((reason) => (
+              <Button
+                key={reason}
+                type="button"
+                size="sm"
+                variant={reasonFilter === reason ? 'default' : 'outline'}
+                onClick={() => setReasonFilter(reason)}
+              >
+                {REASON_LABELS[reason]} ({countByReason.get(reason) ?? 0})
+              </Button>
+            ))}
+          </div>
           <Input placeholder="Filtrar por auditor" value={sellerSearch} onChange={(event) => setSellerSearch(event.target.value)} />
         </CardContent>
       </Card>
@@ -165,19 +206,56 @@ export const ReturnsPage: React.FC = () => {
                 {items.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nenhum item registrado.</p>
                 ) : (
-                  items.map((item: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 p-3 text-sm">
-                      <div>
-                        <p className="font-medium text-foreground">{item.name}</p>
-                        <p className="text-muted-foreground">Cod {item.code}</p>
+                  items.map((item: any, index: number) => {
+                    const photoUrl = item.hasPhoto && item.id ? returnPhotoUrl(selected.source_session_id, String(item.id)) : null;
+                    return (
+                      <div key={index} className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                        {photoUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => setZoomPhoto({ url: photoUrl, name: item.name })}
+                            className="shrink-0 overflow-hidden rounded-md border border-border"
+                            title="Ver foto"
+                          >
+                            <img src={photoUrl} alt={item.name} className="h-16 w-16 object-cover" loading="lazy" />
+                          </button>
+                        ) : (
+                          <div
+                            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-center text-[10px] text-muted-foreground"
+                            title="Devolucoes enviadas antes desta versao do app nao trazem a foto"
+                          >
+                            sem foto
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-foreground">{item.name}</p>
+                          <p className="text-muted-foreground">Cod {item.code}</p>
+                        </div>
+                        <Badge variant="outline">Qtd {item.quantity}</Badge>
                       </div>
-                      <Badge variant="outline">Qtd {item.quantity}</Badge>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!zoomPhoto} onOpenChange={(open) => !open && setZoomPhoto(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{zoomPhoto?.name}</DialogTitle>
+            <DialogDescription>Foto tirada no app na hora da devolucao.</DialogDescription>
+          </DialogHeader>
+          {zoomPhoto && (
+            <div className="space-y-3">
+              <img src={zoomPhoto.url} alt={zoomPhoto.name} className="max-h-[70vh] w-full rounded-lg object-contain" />
+              <a href={zoomPhoto.url} target="_blank" rel="noreferrer" className="text-sm text-primary underline">
+                Abrir em tamanho original
+              </a>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
