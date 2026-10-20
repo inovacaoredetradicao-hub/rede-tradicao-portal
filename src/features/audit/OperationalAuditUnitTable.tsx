@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PortalAuditUnitMetrics } from '@/types';
+import { ABC_TONES, getAbcCurve } from '@/lib/abcCurve';
 
 interface OperationalAuditUnitTableProps {
   loading: boolean;
@@ -14,13 +15,7 @@ function formatPercentage(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
-// Curva ABC sobre a acuracidade media das auditorias da filial:
-// A = acima de 90% | B = de 80% a 90% | C = abaixo de 80%.
-function abcCurve(score: number) {
-  if (score > 90) return { letter: 'A', tone: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
-  if (score >= 80) return { letter: 'B', tone: 'bg-amber-500/15 text-amber-600 border-amber-500/30' };
-  return { letter: 'C', tone: 'bg-rose-500/15 text-rose-600 border-rose-500/30' };
-}
+
 
 export const OperationalAuditUnitTable: React.FC<OperationalAuditUnitTableProps> = ({ loading, rows }) => {
   return (
@@ -73,12 +68,12 @@ export const OperationalAuditUnitTable: React.FC<OperationalAuditUnitTableProps>
                   <TableCell>{row.totalReturns}</TableCell>
                   <TableCell>{formatPercentage(row.avgAuditAccuracy)}</TableCell>
                   <TableCell>
-                    {row.totalAudits > 0 ? (
+                    {getAbcCurve(row.avgAuditAccuracy, row.totalAudits) ? (
                       <span
-                        className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-sm font-bold ${abcCurve(row.avgAuditAccuracy).tone}`}
+                        className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-sm font-bold ${ABC_TONES[getAbcCurve(row.avgAuditAccuracy, row.totalAudits)!]}`}
                         title={`Acuracidade media: ${formatPercentage(row.avgAuditAccuracy)}`}
                       >
-                        {abcCurve(row.avgAuditAccuracy).letter}
+                        {getAbcCurve(row.avgAuditAccuracy, row.totalAudits)}
                       </span>
                     ) : (
                       <span className="text-muted-foreground" title="Filial sem auditoria no periodo">

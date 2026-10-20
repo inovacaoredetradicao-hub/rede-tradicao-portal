@@ -1,6 +1,8 @@
-import React from 'react';
+import { ABC_RANGES, AbcCurve, getAbcCurve } from '@/lib/abcCurve';
+import React, { useMemo, useState } from 'react';
 import {
   Activity,
+  BarChart3,
   Building2,
   Calendar,
   ChevronRight,
@@ -23,6 +25,7 @@ import { getPortalAuditApiBaseUrl } from '@/services/portalAuditApi';
 import { OperationalAuditLossesSection } from './OperationalAuditLossesSection';
 import { OperationalAuditSummaryCards } from './OperationalAuditSummaryCards';
 import { OperationalAuditUnitTable } from './OperationalAuditUnitTable';
+import { PortalAuditUnitMetrics } from '@/types';
 
 interface OperationalAuditOverviewProps {
   onNavigate: (view: string) => void;
@@ -84,6 +87,42 @@ export const OperationalAuditOverview: React.FC<OperationalAuditOverviewProps> =
     reload,
   } = useOperationalAuditDashboard();
 
+  // Filtro por Curva ABC (acuracidade): aplicado aqui sobre as filiais ja carregadas,
+  // vale para a tabela, para o quadro de perdas e para os cartoes de resumo.
+  const [curve, setCurve] = useState<'all' | AbcCurve | 'sem'>('all');
+  const curveUnitIds = useMemo(() => {
+    if (curve === 'all') return null;
+    return new Set(
+      unitMetrics
+        .filter((row) => {
+          const rowCurve = getAbcCurve(row.avgAuditAccuracy, row.totalAudits);
+          return curve === 'sem' ? rowCurve === null : rowCurve === curve;
+        })
+        .map((row) => row.unitId),
+    );
+  }, [curve, unitMetrics]);
+
+  const visibleUnitMetrics = curveUnitIds ? unitMetrics.filter((row) => curveUnitIds.has(row.unitId)) : unitMetrics;
+  const visibleShortageUnits = curveUnitIds ? topShortageUnits.filter((row) => curveUnitIds.has(row.unitId)) : topShortageUnits;
+  const visibleSurplusUnits = curveUnitIds ? topSurplusUnits.filter((row) => curveUnitIds.has(row.unitId)) : topSurplusUnits;
+  // Resumo recalculado so com as filiais da curva (medias ponderadas pela quantidade).
+  const visibleSummary = useMemo(() => {
+    if (!curveUnitIds || !summary) return summary;
+    const rows = visibleUnitMetrics;
+    const sum = (pick: (row: PortalAuditUnitMetrics) => number) => rows.reduce((total, row) => total + pick(row), 0);
+    const totalAudits = sum((row) => row.totalAudits);
+    const totalChecklists = sum((row) => row.totalChecklists);
+    return {
+      ...summary,
+      totalAudits,
+      totalChecklists,
+      totalReturns: sum((row) => row.totalReturns),
+      totalReturnedItems: sum((row) => row.totalReturnedItems),
+      avgAuditAccuracy: totalAudits ? sum((row) => row.avgAuditAccuracy * row.totalAudits) / totalAudits : 0,
+      avgChecklistScore: totalChecklists ? sum((row) => row.avgChecklistScore * row.totalChecklists) / totalChecklists : 0,
+    };
+  }, [curveUnitIds, summary, visibleUnitMetrics]);
+
   const navCards = [
     {
       id: 'management',
@@ -117,8 +156,12 @@ export const OperationalAuditOverview: React.FC<OperationalAuditOverviewProps> =
   const filteredCards = navCards.filter((card) => !card.adminOnly || profile?.role === 'admin');
 
   const selectedUnitName = filters.unitId !== 'all' ? unitOptions.find((unit) => unit.id === filters.unitId)?.name : undefined;
-  const activeFilterCount = (filters.unitId !== 'all' ? 1 : 0) + (filters.dateFrom || filters.dateTo ? 1 : 0);
-  const clearFilters = () => setFilters((current) => ({ ...current, unitId: 'all', dateFrom: '', dateTo: '' }));
+  const activeFilterCount =
+    (filters.unitId !== 'all' ? 1 : 0) + (filters.dateFrom || filters.dateTo ? 1 : 0) + (curve !== 'all' ? 1 : 0);
+  const clearFilters = () => {
+    setFilters((current) => ({ ...current, unitId: 'all', dateFrom: '', dateTo: '' }));
+    setCurve('all');
+  };
 
   return (
     <div className="space-y-8">
@@ -164,7 +207,7 @@ export const OperationalAuditOverview: React.FC<OperationalAuditOverviewProps> =
               </div>
               <div>
                 <CardTitle className="text-xl">Filtros do Dashboard</CardTitle>
-                <CardDescription>Veja os indicadores de uma filial e/ou periodo especifico.</CardDescription>
+                <CardDescription>Veja os indicadores por filial, curva ABC (acuracidade) e/ou periodo.</CardDescription>
               </div>
             </div>
             {activeFilterCount > 0 && (
@@ -175,7 +218,7 @@ export const OperationalAuditOverview: React.FC<OperationalAuditOverviewProps> =
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <Building2 className="h-3.5 w-3.5" />
@@ -192,6 +235,25 @@ export const OperationalAuditOverview: React.FC<OperationalAuditOverviewProps> =
                       {unit.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <BarChart3 className="h-3.5 w-3.5" />
+                Curva ABC
+              </Label>
+              <Select value={curve} onValueChange={(value) => setCurve(value as typeof curve)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as curvas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as curvas</SelectItem>
+                  <SelectItem value="A">Curva A ({ABC_RANGES.A})</SelectItem>
+                  <SelectItem value="B">Curva B ({ABC_RANGES.B})</SelectItem>
+                  <SelectItem value="C">Curva C ({ABC_RANGES.C})</SelectItem>
+                  <SelectItem value="sem">Sem auditoria</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -255,6 +317,14 @@ export const OperationalAuditOverview: React.FC<OperationalAuditOverviewProps> =
                   </button>
                 </Badge>
               )}
+              {curve !== 'all' && (
+                <Badge variant="secondary" className="gap-1.5 py-1 pl-2.5 pr-1.5 font-normal">
+                  {curve === 'sem' ? 'Sem auditoria' : `Curva ${curve}`} · {visibleUnitMetrics.length} filial(is)
+                  <button type="button" onClick={() => setCurve('all')} className="rounded-full p-0.5 hover:bg-background/60">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
               {(filters.dateFrom || filters.dateTo) && (
                 <Badge variant="secondary" className="gap-1.5 py-1 pl-2.5 pr-1.5 font-normal">
                   Periodo: {filters.dateFrom || '...'} a {filters.dateTo || '...'}
@@ -287,13 +357,13 @@ export const OperationalAuditOverview: React.FC<OperationalAuditOverviewProps> =
         </Card>
       ) : (
         <>
-          <OperationalAuditSummaryCards loading={loading} summary={summary} />
+          <OperationalAuditSummaryCards loading={loading} summary={visibleSummary} />
           <OperationalAuditLossesSection
             loading={loading}
-            topShortageUnits={topShortageUnits}
-            topSurplusUnits={topSurplusUnits}
+            topShortageUnits={visibleShortageUnits}
+            topSurplusUnits={visibleSurplusUnits}
           />
-          <OperationalAuditUnitTable loading={loading} rows={unitMetrics} />
+          <OperationalAuditUnitTable loading={loading} rows={visibleUnitMetrics} />
           {!loading && !hasData && (
             <Card className="border-dashed border-border/80">
               <CardContent className="px-6 py-12 text-center">
