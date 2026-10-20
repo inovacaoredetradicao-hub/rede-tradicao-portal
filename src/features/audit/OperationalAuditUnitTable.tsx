@@ -14,7 +14,7 @@ function formatPercentage(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
-// Curva ABC sobre a nota media dos checklists da filial:
+// Curva ABC sobre a acuracidade media das auditorias da filial:
 // A = acima de 90% | B = de 80% a 90% | C = abaixo de 80%.
 function abcCurve(score: number) {
   if (score > 90) return { letter: 'A', tone: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30' };
@@ -28,8 +28,8 @@ export const OperationalAuditUnitTable: React.FC<OperationalAuditUnitTableProps>
       <CardHeader>
         <CardTitle className="text-xl">Visão Por Filial</CardTitle>
         <CardDescription>
-          Indicadores consolidados por filial. Curva ABC pela nota media dos checklists: A acima de 90%, B de 80% a 90%, C
-          abaixo de 80%.
+          Indicadores consolidados por filial. Curva ABC pela acuracidade media: A acima de 90%, B de 80% a 90%, C abaixo
+          de 80%.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -58,7 +58,7 @@ export const OperationalAuditUnitTable: React.FC<OperationalAuditUnitTableProps>
                 <TableHead>Checklists</TableHead>
                 <TableHead>Devoluções</TableHead>
                 <TableHead>Acuracidade média</TableHead>
-                <TableHead title="A: acima de 90% · B: de 80% a 90% · C: abaixo de 80% (nota media dos checklists)">
+                <TableHead title="A: acima de 90% · B: de 80% a 90% · C: abaixo de 80% (acuracidade media)">
                   Curva ABC
                 </TableHead>
                 <TableHead className="pr-6">Itens devolvidos</TableHead>
@@ -73,16 +73,15 @@ export const OperationalAuditUnitTable: React.FC<OperationalAuditUnitTableProps>
                   <TableCell>{row.totalReturns}</TableCell>
                   <TableCell>{formatPercentage(row.avgAuditAccuracy)}</TableCell>
                   <TableCell>
-                    {row.totalChecklists > 0 ? (
+                    {row.totalAudits > 0 ? (
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-sm font-bold ${abcCurve(row.avgChecklistScore).tone}`}
-                        title={`Nota media dos checklists: ${formatPercentage(row.avgChecklistScore)}`}
+                        className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-sm font-bold ${abcCurve(row.avgAuditAccuracy).tone}`}
+                        title={`Acuracidade media: ${formatPercentage(row.avgAuditAccuracy)}`}
                       >
-                        {abcCurve(row.avgChecklistScore).letter}
-                        <span className="text-xs font-normal">{formatPercentage(row.avgChecklistScore)}</span>
+                        {abcCurve(row.avgAuditAccuracy).letter}
                       </span>
                     ) : (
-                      <span className="text-muted-foreground" title="Filial sem checklist no periodo">
+                      <span className="text-muted-foreground" title="Filial sem auditoria no periodo">
                         —
                       </span>
                     )}
