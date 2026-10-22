@@ -134,6 +134,64 @@ export async function getPortalReturns(filters: { unitId?: string; sellerName?: 
   return requestJson<PortalReturnSummary[]>(`/portal/returns${buildQuery(filters)}`);
 }
 
+export interface LossBreakdownRow {
+  key: string;
+  total_cost: number;
+  quantity: number;
+  items: number;
+}
+
+export interface LossDashboard {
+  year: number;
+  kpis: {
+    total_cost: number;
+    vencidos_cost: number;
+    avariados_cost: number;
+    quantity: number;
+    items: number;
+    repeated_lots: number;
+  };
+  byCurve: LossBreakdownRow[];
+  byPromotion: LossBreakdownRow[];
+  byOrigin: LossBreakdownRow[];
+  byLossType: LossBreakdownRow[];
+  byReason: LossBreakdownRow[];
+  monthly: { month: number; total_cost: number; vencidos_cost: number; avariados_cost: number }[];
+}
+
+export interface LossItem {
+  source_session_id: string;
+  item_id: string;
+  unit_id: string;
+  unit_name: string | null;
+  seller_name: string | null;
+  finished_at: string | null;
+  code: string | null;
+  name: string | null;
+  lot: string | null;
+  curve: string | null;
+  origin: string | null;
+  manufactured_at: string | null;
+  expires_at: string | null;
+  loss_type: string | null;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  promotion: boolean | null;
+  loss_reason: string | null;
+  has_photo: boolean;
+}
+
+export type LossFilters = { unitId?: string; year?: string; dateFrom?: string; dateTo?: string };
+
+export async function getLossDashboard(filters: LossFilters = {}) {
+  return requestJson<LossDashboard>(`/portal/losses/dashboard${buildQuery(filters)}`);
+}
+
+export async function getLossItems(filters: LossFilters = {}) {
+  return requestJson<LossItem[]>(`/portal/losses/items${buildQuery(filters)}`);
+}
+
 export async function getPortalReturnDetail(sourceSessionId: string) {
   return requestJson<PortalReturnDetail>(`/portal/returns/${sourceSessionId}`);
 }

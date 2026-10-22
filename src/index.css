@@ -66,9 +66,22 @@
     --text-primary: #374151;
     --text-secondary: #6B7280;
     --text-disabled: #9CA3AF;
+
+    /* Graficos (paleta validada para daltonismo): geral, vencido, avariado */
+    --viz-series-1: #2a78d6;
+    --viz-vencido: #eb6834;
+    --viz-avariado: #1baf7a;
+    --viz-grid: #e5e7eb;
+    --viz-axis: #6b7280;
   }
 
   .dark {
+    --viz-series-1: #3987e5;
+    --viz-vencido: #d95926;
+    --viz-avariado: #199e70;
+    --viz-grid: #1f2937;
+    --viz-axis: #9ca3af;
+
     --background: #0B0F1A;
     --foreground: #F9FAFB;
     

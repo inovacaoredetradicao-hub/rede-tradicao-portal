@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getPortalAuditApiBaseUrl, getPortalReturnDetail, getPortalReturns } from '@/services/portalAuditApi';
 import { withTokenQuery } from '@/lib/session';
+import { LossDashboard } from './LossDashboard';
 import { PortalReturnDetail, PortalReturnSummary } from '@/types';
 
 // "vencidos_ou_avarias" e o motivo antigo, de antes de separar avariados e vencidos.
@@ -41,6 +42,7 @@ export const ReturnsPage: React.FC = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [reasonFilter, setReasonFilter] = useState<string>('todos');
   const [zoomPhoto, setZoomPhoto] = useState<{ url: string; name: string } | null>(null);
+  const [view, setView] = useState<'perdas' | 'devolucoes'>('perdas');
 
   const load = async () => {
     setLoading(true);
@@ -95,13 +97,36 @@ export const ReturnsPage: React.FC = () => {
 
   const items = (selected?.payload as any)?.items ?? [];
 
+  const header = (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-3xl font-bold text-foreground">Devolucoes e perdas</h2>
+        <p className="text-muted-foreground">Vencidos, avariados e devolucoes de mercadoria enviadas pelo app.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant={view === 'perdas' ? 'default' : 'outline'} onClick={() => setView('perdas')}>
+          Painel de perdas
+        </Button>
+        <Button type="button" variant={view === 'devolucoes' ? 'default' : 'outline'} onClick={() => setView('devolucoes')}>
+          Devolucoes recebidas
+        </Button>
+      </div>
+    </div>
+  );
+
+  if (view === 'perdas') {
+    return (
+      <div className="space-y-6">
+        {header}
+        <LossDashboard />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-foreground">Devolucoes</h2>
-          <p className="text-muted-foreground">Devolucoes de mercadoria finalizadas e enviadas pelo app.</p>
-        </div>
+      {header}
+      <div className="flex justify-end">
         <Button variant="outline" className="gap-2" onClick={() => void load()} disabled={loading}>
           <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           Atualizar
@@ -230,6 +255,13 @@ export const ReturnsPage: React.FC = () => {
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium text-foreground">{item.name}</p>
                           <p className="text-muted-foreground">Cod {item.code}</p>
+                          {(item.lot || item.expiresAt) && (
+                            <p className="text-xs text-muted-foreground">
+                              {[item.lot && `Lote ${item.lot}`, item.expiresAt && `Val ${String(item.expiresAt).split('-').reverse().join('/')}`, item.curve && `Curva ${item.curve}`]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          )}
                         </div>
                         <Badge variant="outline">Qtd {item.quantity}</Badge>
                       </div>
