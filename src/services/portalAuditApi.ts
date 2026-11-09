@@ -160,7 +160,12 @@ export interface LossDashboard {
   byOrigin: LossBreakdownRow[];
   byLossType: LossBreakdownRow[];
   byReason: LossBreakdownRow[];
-  monthly: { month: number; total_cost: number; vencidos_cost: number; avariados_cost: number }[];
+  monthly: { month: number; total_cost: number; vencidos_cost: number; avariados_cost: number; bonificado_cost?: number }[];
+  /** Quanto de cada tipo de perda voltou como bonificacao. */
+  recovery?: {
+    vencido: { loss: number; recovered: number };
+    avariado: { loss: number; recovered: number };
+  };
 }
 
 export interface LossItem {

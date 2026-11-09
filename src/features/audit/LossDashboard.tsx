@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getOperationalUnits } from '@/features/operational-alerts/api';
+import { RecoveryCard } from './RecoveryCard';
 import { LossBreakdownRow, LossDashboard as LossDashboardData, LossItem, getLossDashboard, getLossItems } from '@/services/portalAuditApi';
 
 // Painel de perdas (vencidos e avariados) montado a partir das devolucoes do app.
@@ -182,6 +183,8 @@ export const LossDashboard: React.FC = () => {
         total: row?.total_cost ?? 0,
         vencido: row?.vencidos_cost ?? 0,
         avariado: row?.avariados_cost ?? 0,
+        recuperado: Math.min(row?.bonificado_cost ?? 0, row?.total_cost ?? 0),
+        naoRecuperado: Math.max((row?.total_cost ?? 0) - (row?.bonificado_cost ?? 0), 0),
       };
     });
   }, [data, year]);
@@ -270,6 +273,13 @@ export const LossDashboard: React.FC = () => {
           tone={(kpis?.repeated_lots ?? 0) > 0 ? 'warning' : undefined}
         />
       </div>
+
+      <RecoveryCard
+        year={year}
+        vencido={data?.recovery?.vencido ?? { loss: kpis?.vencidos_cost ?? 0, recovered: 0 }}
+        avariado={data?.recovery?.avariado ?? { loss: kpis?.avariados_cost ?? 0, recovered: 0 }}
+        monthly={monthly}
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[

@@ -71,6 +71,8 @@
     --viz-series-1: #2a78d6;
     --viz-vencido: #eb6834;
     --viz-avariado: #1baf7a;
+    --viz-recuperado: #6250d6;
+    --viz-nao-recuperado: #e34948;
     --viz-grid: #e5e7eb;
     --viz-axis: #6b7280;
   }
@@ -79,6 +81,8 @@
     --viz-series-1: #3987e5;
     --viz-vencido: #d95926;
     --viz-avariado: #199e70;
+    --viz-recuperado: #9085e9;
+    --viz-nao-recuperado: #e66767;
     --viz-grid: #1f2937;
     --viz-axis: #9ca3af;
 
