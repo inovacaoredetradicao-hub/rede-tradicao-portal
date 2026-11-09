@@ -19,7 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
   const navItems = [
     { id: 'overview', label: 'Visao geral', icon: LayoutDashboard, adminOnly: false },
     { id: 'management', label: 'Gestao de contagens', icon: Settings2, adminOnly: true },
-    { id: 'checklists', label: 'Checklists', icon: ClipboardList, adminOnly: false },
+    { id: 'checklists', label: 'Checklist', icon: ClipboardList, adminOnly: false },
     { id: 'returns', label: 'Devolucoes', icon: Undo2, adminOnly: false },
     { id: 'uniforms', label: 'Uniformes', icon: Shirt, adminOnly: false },
     { id: 'products', label: 'Produtos', icon: Barcode, adminOnly: true },

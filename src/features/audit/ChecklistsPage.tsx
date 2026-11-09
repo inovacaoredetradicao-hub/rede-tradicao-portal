@@ -10,6 +10,7 @@ import { getPortalChecklistDetail, getPortalChecklists } from '@/services/portal
 import { getOperationalUnits } from '@/features/operational-alerts/api';
 import { OperationalUnitOption } from '@/features/operational-alerts/types';
 import { PortalChecklistDetail, PortalChecklistSummary } from '@/types';
+import { StockOrganizationPage } from './StockOrganizationPage';
 
 const STATUS_LABELS: Record<string, string> = {
   conforme: 'Conforme',
@@ -51,7 +52,7 @@ function getPayloadSections(payload: unknown): PayloadChecklistSection[] {
   return Array.isArray(sections) ? (sections as PayloadChecklistSection[]) : [];
 }
 
-export const ChecklistsPage: React.FC = () => {
+const LegacyChecklistsPage: React.FC = () => {
   const [checklists, setChecklists] = useState<PortalChecklistSummary[]>([]);
   const [units, setUnits] = useState<OperationalUnitOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,7 +115,7 @@ export const ChecklistsPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Checklists</h2>
+          <h3 className="text-xl font-semibold text-foreground">Checklists antigos</h3>
           <p className="text-muted-foreground">Checklists de conformidade finalizados e enviados pelo app, por filial.</p>
         </div>
         <Button variant="outline" className="gap-2" onClick={() => void load(unitFilter)} disabled={loading}>
@@ -262,6 +263,40 @@ export const ChecklistsPage: React.FC = () => {
           ) : null}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+};
+
+// Aba Checklist: modulos Ferramentas (em construcao) e Organizacao de estoque.
+// Os checklists de conformidade antigos continuam acessiveis para consulta.
+export const ChecklistsPage: React.FC = () => {
+  const [view, setView] = useState<'estoque' | 'ferramentas' | 'antigos'>('estoque');
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-3xl font-bold text-foreground">Checklist</h2>
+          <p className="text-muted-foreground">Ferramentas e organizacao de estoque das filiais.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant={view === 'estoque' ? 'default' : 'outline'} onClick={() => setView('estoque')}>
+            Organizacao de estoque
+          </Button>
+          <Button type="button" variant={view === 'ferramentas' ? 'default' : 'outline'} onClick={() => setView('ferramentas')}>
+            Ferramentas
+          </Button>
+          <Button type="button" variant="ghost" className={view === 'antigos' ? 'underline' : 'text-muted-foreground'} onClick={() => setView('antigos')}>
+            Checklists antigos
+          </Button>
+        </div>
+      </div>
+      {view === 'estoque' && <StockOrganizationPage />}
+      {view === 'ferramentas' && (
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">Modulo Ferramentas em construcao.</CardContent>
+        </Card>
+      )}
+      {view === 'antigos' && <LegacyChecklistsPage />}
     </div>
   );
 };

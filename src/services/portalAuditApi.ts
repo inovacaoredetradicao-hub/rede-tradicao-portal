@@ -214,3 +214,52 @@ export function getPortalAuditPdfUrl(sourceSessionId: string) {
 export function getPortalAuditApiBaseUrl() {
   return getPortalApiBaseUrl();
 }
+
+// ---- Organizacao de estoque: solicitar foto do estoque da filial e avaliar ----
+export type StockPhotoStatus = 'pendente' | 'enviado' | 'avaliado';
+export type StockRating = 'organizado' | 'parcial' | 'desorganizado';
+
+export interface StockPhotoRequest {
+  id: string;
+  unit_id: string;
+  unit_name: string | null;
+  instructions: string | null;
+  requested_by_name: string | null;
+  requested_at: string;
+  due_at: string | null;
+  status: StockPhotoStatus;
+  sent_at: string | null;
+  sent_by_name: string | null;
+  sent_note: string | null;
+  rating: StockRating | null;
+  evaluation_note: string | null;
+  evaluated_at: string | null;
+  evaluated_by_name: string | null;
+  photo_count: number;
+}
+
+export async function getStockPhotoRequests(filters: { status?: string; unitId?: string } = {}) {
+  return requestJson<StockPhotoRequest[]>(`/stock-organization/requests${buildQuery(filters)}`);
+}
+
+export async function createStockPhotoRequests(payload: { unitIds: string[]; instructions?: string; dueAt?: string }) {
+  return requestPostJson<{ created: number }>('/stock-organization/requests', payload);
+}
+
+export async function evaluateStockPhotoRequest(id: string, rating: StockRating, note: string) {
+  return requestPostJson<{ success: true }>(`/stock-organization/requests/${encodeURIComponent(id)}/evaluation`, { rating, note });
+}
+
+export async function cancelStockPhotoRequest(id: string) {
+  const response = await fetchWithTimeout(`${getPortalApiBaseUrl()}/stock-organization/requests/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ error: `Falha na API (${response.status}).` }));
+    throw new Error(payload.error ?? `Falha na API (${response.status}).`);
+  }
+}
+
+export function stockPhotoUrl(id: string, position: number) {
+  return withTokenQuery(`${getPortalApiBaseUrl()}/stock-organization/requests/${encodeURIComponent(id)}/photos/${position}`);
+}
