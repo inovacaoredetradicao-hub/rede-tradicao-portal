@@ -293,7 +293,7 @@ export const LossDashboard: React.FC = () => {
         <Card className="border-border/60 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Tendencia mensal da perda</CardTitle>
-            <CardDescription>Valor perdido por mes em {year}</CardDescription>
+            <CardDescription>Valor perdido por mes em {year}: total, vencidos e avariados</CardDescription>
           </CardHeader>
           <CardContent className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -302,15 +302,23 @@ export const LossDashboard: React.FC = () => {
                 <XAxis dataKey="label" {...axisProps} tickFormatter={(value: string) => value.slice(0, 2)} />
                 <YAxis {...axisProps} width={72} tickFormatter={(value: number) => brlShort.format(value)} />
                 <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--viz-axis)', strokeDasharray: '3 3' }} />
-                <Line
-                  type="monotone"
-                  dataKey="total"
-                  name="Perda total"
-                  stroke="var(--viz-series-1)"
-                  strokeWidth={2}
-                  dot={{ r: 4, strokeWidth: 2, fill: 'var(--card)' }}
-                  activeDot={{ r: 6, strokeWidth: 2, stroke: 'var(--card)' }}
-                />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                {[
+                  { key: 'total', name: 'Perda total', color: 'var(--viz-series-1)' },
+                  { key: 'vencido', name: 'Vencidos', color: 'var(--viz-vencido)' },
+                  { key: 'avariado', name: 'Avariados', color: 'var(--viz-avariado)' },
+                ].map((serie) => (
+                  <Line
+                    key={serie.key}
+                    type="monotone"
+                    dataKey={serie.key}
+                    name={serie.name}
+                    stroke={serie.color}
+                    strokeWidth={2}
+                    dot={{ r: 4, strokeWidth: 2, fill: 'var(--card)' }}
+                    activeDot={{ r: 6, strokeWidth: 2, stroke: 'var(--card)' }}
+                  />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
