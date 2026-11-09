@@ -82,7 +82,10 @@ export const StockOrganizationPage: React.FC = () => {
   }, []);
 
   const filteredUnits = useMemo(
-    () => units.filter((unit) => unit.displayLabel.toLowerCase().includes(unitSearch.trim().toLowerCase())),
+    () =>
+      units
+        .filter((unit) => unit.name.toLowerCase().includes(unitSearch.trim().toLowerCase()))
+        .sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { numeric: true })),
     [units, unitSearch],
   );
 
@@ -201,7 +204,7 @@ export const StockOrganizationPage: React.FC = () => {
                 filteredUnits.map((unit) => (
                   <label key={unit.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted">
                     <input type="checkbox" className="h-4 w-4 accent-primary" checked={selectedUnits.has(unit.id)} onChange={() => toggleUnit(unit.id)} />
-                    {unit.displayLabel}
+                    {unit.name}
                   </label>
                 ))
               )}
