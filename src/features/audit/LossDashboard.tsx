@@ -186,27 +186,16 @@ export const LossDashboard: React.FC = () => {
     });
   }, [data, year]);
 
-  // Lote repetido: mesmo produto + lote em mais de uma devolucao (destaca na tabela).
-  const repeatedLotKeys = useMemo(() => {
-    const sessions = new Map<string, Set<string>>();
-    items.forEach((item) => {
-      if (!item.lot) return;
-      const key = `${item.code}|${item.lot}`;
-      if (!sessions.has(key)) sessions.set(key, new Set());
-      sessions.get(key)!.add(item.source_session_id);
-    });
-    return new Set([...sessions].filter(([, set]) => set.size > 1).map(([key]) => key));
-  }, [items]);
-
+  // repeated_lot vem do servidor: mesmo produto + lote em outra devolucao da mesma filial.
   const filteredItems = useMemo(() => {
     const term = search.trim().toLowerCase();
     return items.filter(
       (item) =>
-        (typeFilter === 'todos' || (typeFilter === 'repetidos' ? repeatedLotKeys.has(`${item.code}|${item.lot}`) : item.loss_type === typeFilter)) &&
+        (typeFilter === 'todos' || (typeFilter === 'repetidos' ? item.repeated_lot : item.loss_type === typeFilter)) &&
         (!term ||
           [item.code, item.name, item.lot, item.unit_name, item.seller_name].some((value) => value?.toLowerCase().includes(term))),
     );
-  }, [items, search, typeFilter, repeatedLotKeys]);
+  }, [items, search, typeFilter]);
 
   const kpis = data?.kpis;
   const years = [currentYear, currentYear - 1, currentYear - 2].map(String);
@@ -266,7 +255,7 @@ export const LossDashboard: React.FC = () => {
           loading={loading}
           title="Lotes repetidos"
           value={String(kpis?.repeated_lots ?? 0)}
-          hint="mesmo produto e lote em mais de uma devolucao"
+          hint="mesmo produto e lote em mais de uma devolucao da mesma filial"
           tone={(kpis?.repeated_lots ?? 0) > 0 ? 'warning' : undefined}
         />
       </div>
@@ -404,7 +393,7 @@ export const LossDashboard: React.FC = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredItems.map((item) => {
-                    const repeated = item.lot && repeatedLotKeys.has(`${item.code}|${item.lot}`);
+                    const repeated = item.repeated_lot;
                     return (
                       <TableRow key={`${item.source_session_id}-${item.item_id}`}>
                         <TableCell className="pl-6 tabular-nums">{item.code ?? '-'}</TableCell>
@@ -420,7 +409,7 @@ export const LossDashboard: React.FC = () => {
                         <TableCell className="whitespace-nowrap">
                           {item.lot ?? '-'}
                           {repeated && (
-                            <Badge variant="outline" className="ml-1.5 border-amber-500/50 text-amber-700 dark:text-amber-400" title="Mesmo lote em mais de uma devolucao">
+                            <Badge variant="outline" className="ml-1.5 border-amber-500/50 text-amber-700 dark:text-amber-400" title="Esta filial ja informou este lote em outra devolucao">
                               <AlertTriangle className="mr-1 h-3 w-3" aria-hidden />
                               repetido
                             </Badge>

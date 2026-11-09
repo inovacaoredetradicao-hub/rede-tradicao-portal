@@ -179,6 +179,7 @@ export interface LossItem {
   total_cost: number;
   promotion: boolean | null;
   loss_reason: string | null;
+  repeated_lot: boolean;
   has_photo: boolean;
 }
 

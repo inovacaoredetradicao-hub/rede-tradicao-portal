@@ -88,8 +88,14 @@ export interface PortalReturnSummary {
   total_quantity: number;
   finished_at: string | null;
   received_at: string;
+  // Itens com lote que a mesma filial ja informou em outra devolucao.
+  repeated_lots?: number;
 }
 
-export interface PortalReturnDetail extends PortalReturnSummary {
+export interface PortalReturnDetail extends Omit<PortalReturnSummary, 'repeated_lots'> {
   payload: unknown;
+  repeated_lots?: {
+    item_id: string;
+    others: { source_session_id: string; finished_at: string | null; seller_name: string | null; quantity: number }[];
+  }[];
 }

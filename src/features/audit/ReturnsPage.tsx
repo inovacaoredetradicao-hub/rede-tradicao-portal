@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Eye, RefreshCcw } from 'lucide-react';
+import { AlertTriangle, Eye, RefreshCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,7 +65,8 @@ export const ReturnsPage: React.FC = () => {
     const search = sellerSearch.trim().toLowerCase();
     return returns.filter(
       (item) =>
-        (reasonFilter === 'todos' || item.reason === reasonFilter) &&
+        (reasonFilter === 'todos' ||
+          (reasonFilter === 'lote_repetido' ? (item.repeated_lots ?? 0) > 0 : item.reason === reasonFilter)) &&
         (!search || item.seller_name.toLowerCase().includes(search)),
     );
   }, [returns, sellerSearch, reasonFilter]);
@@ -73,6 +74,7 @@ export const ReturnsPage: React.FC = () => {
   const countByReason = useMemo(() => {
     const counts = new Map<string, number>();
     returns.forEach((item) => counts.set(item.reason, (counts.get(item.reason) ?? 0) + 1));
+    counts.set('lote_repetido', returns.filter((item) => (item.repeated_lots ?? 0) > 0).length);
     return counts;
   }, [returns]);
 
@@ -96,6 +98,7 @@ export const ReturnsPage: React.FC = () => {
   };
 
   const items = (selected?.payload as any)?.items ?? [];
+  const repeatedByItem = new Map((selected?.repeated_lots ?? []).map((entry) => [entry.item_id, entry.others]));
 
   const header = (
     <div className="space-y-4">
@@ -162,6 +165,18 @@ export const ReturnsPage: React.FC = () => {
                 {REASON_LABELS[reason]} ({countByReason.get(reason) ?? 0})
               </Button>
             ))}
+            {(countByReason.get('lote_repetido') ?? 0) > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant={reasonFilter === 'lote_repetido' ? 'default' : 'outline'}
+                className={reasonFilter === 'lote_repetido' ? undefined : 'border-amber-500/50 text-amber-700 dark:text-amber-400'}
+                onClick={() => setReasonFilter('lote_repetido')}
+              >
+                <AlertTriangle className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                Lote repetido ({countByReason.get('lote_repetido')})
+              </Button>
+            )}
           </div>
           <Input placeholder="Filtrar por auditor" value={sellerSearch} onChange={(event) => setSellerSearch(event.target.value)} />
         </CardContent>
@@ -193,7 +208,19 @@ export const ReturnsPage: React.FC = () => {
                   <TableRow key={item.id}>
                     <TableCell className="pl-6 font-medium text-foreground">{item.seller_name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{REASON_LABELS[item.reason] ?? item.reason}</Badge>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant="outline">{REASON_LABELS[item.reason] ?? item.reason}</Badge>
+                        {(item.repeated_lots ?? 0) > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                            title="Esta filial ja informou o mesmo lote deste produto em outra devolucao"
+                          >
+                            <AlertTriangle className="mr-1 h-3 w-3" aria-hidden />
+                            {item.repeated_lots === 1 ? '1 lote repetido' : `${item.repeated_lots} lotes repetidos`}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{formatDateTime(item.finished_at)}</TableCell>
                     <TableCell>{item.total_items} ({item.total_quantity})</TableCell>
@@ -233,8 +260,14 @@ export const ReturnsPage: React.FC = () => {
                 ) : (
                   items.map((item: any, index: number) => {
                     const photoUrl = item.hasPhoto && item.id ? returnPhotoUrl(selected.source_session_id, String(item.id)) : null;
+                    const others = item.id ? repeatedByItem.get(String(item.id)) : undefined;
                     return (
-                      <div key={index} className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                      <div key={index} className="space-y-2">
+                      <div
+                        className={`flex items-center gap-3 rounded-lg border p-3 text-sm ${
+                          others ? 'border-amber-500/50 bg-amber-500/5' : 'border-border bg-muted/20'
+                        }`}
+                      >
                         {photoUrl ? (
                           <button
                             type="button"
@@ -264,6 +297,21 @@ export const ReturnsPage: React.FC = () => {
                           )}
                         </div>
                         <Badge variant="outline">Qtd {item.quantity}</Badge>
+                      </div>
+                      {others && (
+                        <div className="flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                          <div>
+                            <p className="font-semibold">Lote {item.lot} repetido nesta filial</p>
+                            {others.map((other) => (
+                              <p key={other.source_session_id}>
+                                Ja informado em {formatDateTime(other.finished_at)}
+                                {other.seller_name ? ` por ${other.seller_name}` : ''} (qtd {other.quantity})
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       </div>
                     );
                   })
