@@ -93,6 +93,8 @@ export interface PortalReturnSummary {
   /** 'perda' ou 'bonificacao' (baixa com bonificacao do fornecedor). */
   settlement?: string;
   invoice_number?: string | null;
+  /** Valor bonificado (R$) informado no app; texto numerico vindo do payload. */
+  bonus_value?: string | null;
   /** Tem o PDF assinado pelo gerente e pelo auditor. */
   has_pdf?: boolean;
 }

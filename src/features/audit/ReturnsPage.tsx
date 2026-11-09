@@ -223,6 +223,7 @@ export const ReturnsPage: React.FC = () => {
                         {item.settlement === 'bonificacao' && (
                           <Badge variant="outline" className="border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
                             Bonificacao{item.invoice_number ? ` - NF ${item.invoice_number}` : ''}
+                            {item.bonus_value ? ` - ${Number(item.bonus_value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
                           </Badge>
                         )}
                       </div>
@@ -272,6 +273,14 @@ export const ReturnsPage: React.FC = () => {
                   <span className="text-muted-foreground">Baixa: </span>
                   <span className="font-semibold">{selected.settlement === 'bonificacao' ? 'Baixa c/ bonificacao' : 'Perda'}</span>
                 </span>
+                {selected.bonus_value && (
+                  <span>
+                    <span className="text-muted-foreground">Valor bonificado: </span>
+                    <span className="font-semibold">
+                      {Number(selected.bonus_value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  </span>
+                )}
                 {selected.invoice_number && (
                   <span>
                     <span className="text-muted-foreground">NF de devolucao: </span>

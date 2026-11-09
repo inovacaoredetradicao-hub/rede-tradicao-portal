@@ -246,7 +246,7 @@ export const LossDashboard: React.FC = () => {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         <StatTile
           loading={loading}
           title="Perda acumulada"
@@ -257,10 +257,11 @@ export const LossDashboard: React.FC = () => {
         <StatTile loading={loading} title="Avariados" value={brl.format(kpis?.avariados_cost ?? 0)} />
         <StatTile
           loading={loading}
-          title="Qtd bonificada"
-          value={qty.format(kpis?.bonificado_quantity ?? 0)}
-          hint={`unidades - ${brl.format(kpis?.bonificado_cost ?? 0)} baixados c/ bonificacao`}
+          title="Valor bonificado"
+          value={brl.format(kpis?.bonificado_cost ?? 0)}
+          hint="informado no app na baixa c/ bonificacao"
         />
+        <StatTile loading={loading} title="Qtd bonificada" value={qty.format(kpis?.bonificado_quantity ?? 0)} hint="unidades" />
         <StatTile
           loading={loading}
           title="Lotes repetidos"
