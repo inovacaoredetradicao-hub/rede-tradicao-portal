@@ -26,10 +26,11 @@ const STATUS_LABELS: Record<string, string> = {
   avaliado: 'Avaliado',
 };
 
+// Curva da organizacao do estoque. Vale pontos no ranking das filiais (A = 100, B = 50, C = 0).
 const RATING_OPTIONS: { value: StockRating; label: string; className: string }[] = [
-  { value: 'organizado', label: 'Organizado', className: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
-  { value: 'parcial', label: 'Parcialmente organizado', className: 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400' },
-  { value: 'desorganizado', label: 'Desorganizado', className: 'border-rose-500/50 bg-rose-500/10 text-rose-700 dark:text-rose-400' },
+  { value: 'A', label: 'Curva A - Organizado', className: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
+  { value: 'B', label: 'Curva B - Parcialmente organizado', className: 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400' },
+  { value: 'C', label: 'Curva C - Desorganizado', className: 'border-rose-500/50 bg-rose-500/10 text-rose-700 dark:text-rose-400' },
 ];
 const ratingOption = (rating: string | null) => RATING_OPTIONS.find((option) => option.value === rating);
 
@@ -146,7 +147,7 @@ export const StockOrganizationPage: React.FC = () => {
 
   const saveEvaluation = async () => {
     if (!selected || !rating) {
-      toast.error('Escolha a avaliacao.');
+      toast.error('Escolha a curva A, B ou C.');
       return;
     }
     setSaving(true);
@@ -367,7 +368,7 @@ export const StockOrganizationPage: React.FC = () => {
               </div>
 
               <div className="space-y-2 rounded-lg border p-4">
-                <p className="text-sm font-medium">Avaliacao da organizacao</p>
+                <p className="text-sm font-medium">Curva da organizacao (vale pontos no ranking: A = 100, B = 50, C = 0)</p>
                 <div className="flex flex-wrap gap-2">
                   {RATING_OPTIONS.map((option) => (
                     <Button

@@ -222,7 +222,25 @@ export function getPortalAuditApiBaseUrl() {
 
 // ---- Organizacao de estoque: solicitar foto do estoque da filial e avaliar ----
 export type StockPhotoStatus = 'pendente' | 'enviado' | 'avaliado';
-export type StockRating = 'organizado' | 'parcial' | 'desorganizado';
+export type StockRating = 'A' | 'B' | 'C';
+
+export interface StockRankingRow {
+  position: number;
+  unit_id: string;
+  unit_name: string | null;
+  /** Media de 0 a 100 (A = 100, B = 50, C = 0). */
+  score: number;
+  evaluations: number;
+  count_a: number;
+  count_b: number;
+  count_c: number;
+  last_rating: StockRating | null;
+  last_evaluated_at: string | null;
+}
+
+export async function getStockRanking(days = 90) {
+  return requestJson<{ days: number; rows: StockRankingRow[] }>(`/stock-organization/ranking?days=${days}`);
+}
 
 export interface StockPhotoRequest {
   id: string;

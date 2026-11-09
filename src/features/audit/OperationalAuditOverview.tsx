@@ -23,6 +23,7 @@ import { useAuth } from '@/AuthContext';
 import { useOperationalAuditDashboard } from '@/hooks/useOperationalAuditDashboard';
 import { getPortalAuditApiBaseUrl } from '@/services/portalAuditApi';
 import { OperationalAuditLossesSection } from './OperationalAuditLossesSection';
+import { StockRankingCard } from './StockRankingCard';
 import { OperationalAuditSummaryCards } from './OperationalAuditSummaryCards';
 import { OperationalAuditUnitTable } from './OperationalAuditUnitTable';
 import { PortalAuditUnitMetrics } from '@/types';
@@ -197,6 +198,8 @@ export const OperationalAuditOverview: React.FC<OperationalAuditOverviewProps> =
           </div>
         </CardContent>
       </Card>
+
+      <StockRankingCard />
 
       <Card className="border-border/60 shadow-sm">
         <CardHeader className="gap-5">
