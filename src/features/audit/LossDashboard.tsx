@@ -247,10 +247,20 @@ export const LossDashboard: React.FC = () => {
       )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatTile loading={loading} title="Perda acumulada" value={brl.format(kpis?.total_cost ?? 0)} hint={`${kpis?.items ?? 0} lancamento(s)`} />
+        <StatTile
+          loading={loading}
+          title="Perda acumulada"
+          value={brl.format(kpis?.perda_acumulada ?? 0)}
+          hint={`vencidos + avariados - bonificado (${kpis?.items ?? 0} lancamento(s))`}
+        />
         <StatTile loading={loading} title="Vencidos" value={brl.format(kpis?.vencidos_cost ?? 0)} />
         <StatTile loading={loading} title="Avariados" value={brl.format(kpis?.avariados_cost ?? 0)} />
-        <StatTile loading={loading} title="Qtd perdida" value={qty.format(kpis?.quantity ?? 0)} hint="unidades" />
+        <StatTile
+          loading={loading}
+          title="Qtd bonificada"
+          value={qty.format(kpis?.bonificado_quantity ?? 0)}
+          hint={`unidades - ${brl.format(kpis?.bonificado_cost ?? 0)} baixados c/ bonificacao`}
+        />
         <StatTile
           loading={loading}
           title="Lotes repetidos"
@@ -396,6 +406,7 @@ export const LossDashboard: React.FC = () => {
                     <TableHead className="text-right">Total</TableHead>
                     <TableHead>Promocao</TableHead>
                     <TableHead>Motivo</TableHead>
+                    <TableHead>Baixa</TableHead>
                     <TableHead className="pr-6">Data</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -442,6 +453,9 @@ export const LossDashboard: React.FC = () => {
                         <TableCell className="text-right font-semibold tabular-nums">{brl.format(item.total_cost)}</TableCell>
                         <TableCell>{item.promotion === null ? '-' : item.promotion ? 'Sim' : 'Nao'}</TableCell>
                         <TableCell className="whitespace-nowrap">{item.loss_reason ? label(LOSS_REASON_LABELS, item.loss_reason) : '-'}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {item.settlement === 'bonificacao' ? `Bonificacao${item.invoice_number ? ` (NF ${item.invoice_number})` : ''}` : 'Perda'}
+                        </TableCell>
                         <TableCell className="whitespace-nowrap pr-6 tabular-nums">
                           {item.finished_at ? new Date(item.finished_at).toLocaleDateString('pt-BR') : '-'}
                         </TableCell>

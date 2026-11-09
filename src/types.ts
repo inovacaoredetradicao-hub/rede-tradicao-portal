@@ -90,6 +90,11 @@ export interface PortalReturnSummary {
   received_at: string;
   // Itens com lote que a mesma filial ja informou em outra devolucao.
   repeated_lots?: number;
+  /** 'perda' ou 'bonificacao' (baixa com bonificacao do fornecedor). */
+  settlement?: string;
+  invoice_number?: string | null;
+  /** Tem o PDF assinado pelo gerente e pelo auditor. */
+  has_pdf?: boolean;
 }
 
 export interface PortalReturnDetail extends Omit<PortalReturnSummary, 'repeated_lots'> {

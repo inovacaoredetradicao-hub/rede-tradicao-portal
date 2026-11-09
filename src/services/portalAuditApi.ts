@@ -150,6 +150,10 @@ export interface LossDashboard {
     quantity: number;
     items: number;
     repeated_lots: number;
+    bonificado_quantity: number;
+    bonificado_cost: number;
+    /** Vencidos + avariados menos o que foi baixado com bonificacao. */
+    perda_acumulada: number;
   };
   byCurve: LossBreakdownRow[];
   byPromotion: LossBreakdownRow[];
@@ -181,6 +185,8 @@ export interface LossItem {
   loss_reason: string | null;
   repeated_lot: boolean;
   has_photo: boolean;
+  settlement: string | null;
+  invoice_number: string | null;
 }
 
 export type LossFilters = { unitId?: string; year?: string; dateFrom?: string; dateTo?: string };
@@ -195,6 +201,10 @@ export async function getLossItems(filters: LossFilters = {}) {
 
 export async function getPortalReturnDetail(sourceSessionId: string) {
   return requestJson<PortalReturnDetail>(`/portal/returns/${sourceSessionId}`);
+}
+
+export function getPortalReturnPdfUrl(sourceSessionId: string) {
+  return withTokenQuery(`${getPortalApiBaseUrl()}/portal/returns/${encodeURIComponent(sourceSessionId)}/pdf`);
 }
 
 export function getPortalAuditPdfUrl(sourceSessionId: string) {

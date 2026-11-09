@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Eye, RefreshCcw } from 'lucide-react';
+import { AlertTriangle, Eye, FileText, RefreshCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { getPortalAuditApiBaseUrl, getPortalReturnDetail, getPortalReturns } from '@/services/portalAuditApi';
+import { getPortalAuditApiBaseUrl, getPortalReturnDetail, getPortalReturnPdfUrl, getPortalReturns } from '@/services/portalAuditApi';
 import { withTokenQuery } from '@/lib/session';
 import { LossDashboard } from './LossDashboard';
 import { PortalReturnDetail, PortalReturnSummary } from '@/types';
@@ -220,14 +220,28 @@ export const ReturnsPage: React.FC = () => {
                             {item.repeated_lots === 1 ? '1 lote repetido' : `${item.repeated_lots} lotes repetidos`}
                           </Badge>
                         )}
+                        {item.settlement === 'bonificacao' && (
+                          <Badge variant="outline" className="border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                            Bonificacao{item.invoice_number ? ` - NF ${item.invoice_number}` : ''}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>{formatDateTime(item.finished_at)}</TableCell>
                     <TableCell>{item.total_items} ({item.total_quantity})</TableCell>
                     <TableCell className="pr-6 text-right">
-                      <Button variant="outline" size="icon" onClick={() => void openDetail(item.source_session_id)} title="Ver devolucao">
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        {item.has_pdf && (
+                          <Button variant="outline" size="icon" asChild title="PDF assinado">
+                            <a href={getPortalReturnPdfUrl(item.source_session_id)} target="_blank" rel="noreferrer">
+                              <FileText className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+                        <Button variant="outline" size="icon" onClick={() => void openDetail(item.source_session_id)} title="Ver devolucao">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -252,6 +266,28 @@ export const ReturnsPage: React.FC = () => {
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Auditor</p><p className="mt-1 font-semibold">{selected.seller_name}</p></CardContent></Card>
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Motivo</p><p className="mt-1 font-semibold">{REASON_LABELS[selected.reason] ?? selected.reason}</p></CardContent></Card>
                 <Card><CardContent className="p-4"><p className="text-xs uppercase text-muted-foreground">Total</p><p className="mt-1 font-semibold">{selected.total_items} itens</p></CardContent></Card>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
+                <span>
+                  <span className="text-muted-foreground">Baixa: </span>
+                  <span className="font-semibold">{selected.settlement === 'bonificacao' ? 'Baixa c/ bonificacao' : 'Perda'}</span>
+                </span>
+                {selected.invoice_number && (
+                  <span>
+                    <span className="text-muted-foreground">NF de devolucao: </span>
+                    <span className="font-semibold">{selected.invoice_number}</span>
+                  </span>
+                )}
+                {selected.has_pdf ? (
+                  <Button variant="outline" size="sm" className="ml-auto" asChild>
+                    <a href={getPortalReturnPdfUrl(selected.source_session_id)} target="_blank" rel="noreferrer">
+                      <FileText className="mr-1.5 h-4 w-4" />
+                      PDF assinado
+                    </a>
+                  </Button>
+                ) : (
+                  <span className="ml-auto text-xs text-muted-foreground">Sem PDF assinado (devolucao anterior a assinatura)</span>
+                )}
               </div>
 
               <div className="space-y-2">
