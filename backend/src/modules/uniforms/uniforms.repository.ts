@@ -62,6 +62,61 @@ export class UniformsRepository {
     return result.rows[0];
   }
 
+  // Exclui um modelo do catalogo. Bloqueia se ainda houver pecas em estoque. Se o modelo
+  // ja teve entradas/saidas, so desativa (o historico continua apontando para ele);
+  // se nunca foi usado, apaga de vez. Recadastrar o mesmo nome+tamanho reativa.
+  async deleteItem(itemId: string) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const item = await client.query<{ name: string; size: string }>(
+        `SELECT name, size FROM uniform_items WHERE id::text = $1 FOR UPDATE`,
+        [itemId],
+      );
+      if (!item.rows[0]) {
+        throw new Error('Modelo nao encontrado no catalogo.');
+      }
+
+      const stock = await client.query<{ total: string }>(
+        `
+          SELECT COALESCE(SUM(quantity), 0)::text AS total FROM (
+            SELECT quantity FROM uniform_unit_stock WHERE uniform_item_id::text = $1
+            UNION ALL
+            SELECT quantity FROM uniform_tags WHERE uniform_item_id::text = $1
+          ) q
+        `,
+        [itemId],
+      );
+      if (Number(stock.rows[0].total) > 0) {
+        const { name, size } = item.rows[0];
+        throw new Error(`${name} ${size} ainda tem pecas em estoque. De saida de todas as pecas antes de excluir o modelo.`);
+      }
+
+      // Sem estoque: libera etiquetas vazias e limpa o estoque zerado das filiais.
+      await client.query(
+        `UPDATE uniform_tags SET status = 'livre', uniform_item_id = NULL, unit_id = NULL, location_label = NULL, quantity = 0, updated_at = NOW()
+         WHERE uniform_item_id::text = $1`,
+        [itemId],
+      );
+      await client.query(`DELETE FROM uniform_unit_stock WHERE uniform_item_id::text = $1`, [itemId]);
+
+      const history = await client.query(`SELECT 1 FROM uniform_stock_movements WHERE uniform_item_id::text = $1 LIMIT 1`, [itemId]);
+      if (history.rowCount) {
+        await client.query(`UPDATE uniform_items SET is_active = false, updated_at = NOW() WHERE id::text = $1`, [itemId]);
+      } else {
+        await client.query(`DELETE FROM uniform_items WHERE id::text = $1`, [itemId]);
+      }
+
+      await client.query('COMMIT');
+      return { ok: true };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async generateTags(input: GenerateTagsInput) {
     const codes = Array.from({ length: input.quantity }, () => generateTagCode());
     const client = await pool.connect();

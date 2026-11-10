@@ -7,6 +7,7 @@ export function createUniformsRouter(controller: UniformsController) {
 
   router.get('/items', asyncHandler(controller.listItems));
   router.post('/items', asyncHandler(controller.createItem));
+  router.delete('/items/:id', asyncHandler(controller.deleteItem));
 
   router.post('/tags/generate', asyncHandler(controller.generateTags));
   router.get('/tags', asyncHandler(controller.listTags));

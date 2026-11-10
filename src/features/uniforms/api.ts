@@ -38,6 +38,9 @@ export const getUniformItems = () => request<UniformItem[]>('/items');
 export const createUniformItem = (input: { name: string; size: string }) =>
   request<UniformItem>('/items', { method: 'POST', body: JSON.stringify(input) });
 
+export const deleteUniformItem = (id: string) =>
+  request<{ ok: boolean }>(`/items/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
 export const generateUniformTags = (input: { quantity: number; batchLabel?: string | null }) =>
   request<UniformTag[]>('/tags/generate', { method: 'POST', body: JSON.stringify(input) });
 

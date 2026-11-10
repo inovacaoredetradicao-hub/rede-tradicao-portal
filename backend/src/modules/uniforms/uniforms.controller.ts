@@ -14,6 +14,10 @@ export class UniformsController {
     response.status(201).json(await this.service.createItem(payload));
   };
 
+  deleteItem = async (request: Request, response: Response) => {
+    response.json(await this.service.deleteItem(String(request.params.id)));
+  };
+
   generateTags = async (request: Request, response: Response) => {
     const payload = request.body as GenerateTagsInput;
     response.status(201).json(await this.service.generateTags(payload));

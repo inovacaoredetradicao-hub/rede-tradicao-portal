@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Printer, Plus, RefreshCcw, Shirt } from 'lucide-react';
+import { Printer, Plus, RefreshCcw, Shirt, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { getOperationalUnits } from '../operational-alerts/api';
 import { OperationalUnitOption } from '../operational-alerts/types';
 import {
   createUniformItem,
+  deleteUniformItem,
   generateUniformTags,
   getUniformItems,
   getUniformStock,
@@ -279,6 +280,7 @@ const CatalogTab: React.FC = () => {
   const [size, setSize] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -312,6 +314,20 @@ const CatalogTab: React.FC = () => {
       toast.error(error instanceof Error ? error.message : 'Nao foi possivel cadastrar o modelo.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (item: UniformItem) => {
+    if (!window.confirm(`Excluir ${item.name} ${item.size} do catalogo?`)) return;
+    setDeletingId(item.id);
+    try {
+      await deleteUniformItem(item.id);
+      toast.success(`${item.name} ${item.size} excluido do catalogo.`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Nao foi possivel excluir o modelo.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -352,14 +368,27 @@ const CatalogTab: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-6">Peca</TableHead>
-                  <TableHead className="pr-6">Tamanho</TableHead>
+                  <TableHead>Tamanho</TableHead>
+                  <TableHead className="w-24 pr-6 text-right">Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="pl-6 font-medium text-foreground">{item.name}</TableCell>
-                    <TableCell className="pr-6">{item.size}</TableCell>
+                    <TableCell>{item.size}</TableCell>
+                    <TableCell className="pr-6 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-destructive hover:text-destructive"
+                        disabled={deletingId === item.id}
+                        onClick={() => void handleDelete(item)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {deletingId === item.id ? 'Excluindo...' : 'Excluir'}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

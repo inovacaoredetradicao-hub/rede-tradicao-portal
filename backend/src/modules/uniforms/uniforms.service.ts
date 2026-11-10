@@ -15,6 +15,10 @@ export class UniformsService {
     return this.repository.createItem(input);
   }
 
+  deleteItem(itemId: string) {
+    return this.repository.deleteItem(itemId);
+  }
+
   generateTags(input: GenerateTagsInput) {
     if (!input.quantity || input.quantity < 1 || input.quantity > 500) {
       throw new Error('Informe uma quantidade de etiquetas entre 1 e 500.');
