@@ -98,7 +98,6 @@ const StockTab: React.FC = () => {
                 <TableRow>
                   <TableHead className="pl-6">Uniforme</TableHead>
                   <TableHead>Quantidade</TableHead>
-                  <TableHead>Local</TableHead>
                   <TableHead>Unidade</TableHead>
                   <TableHead className="pr-6">Etiqueta</TableHead>
                 </TableRow>
@@ -112,7 +111,6 @@ const StockTab: React.FC = () => {
                     <TableCell>
                       <Badge variant="outline">{row.quantity}</Badge>
                     </TableCell>
-                    <TableCell>{row.locationLabel || 'Sem local especifico (recebido por transferencia)'}</TableCell>
                     <TableCell>{row.unitName}</TableCell>
                     <TableCell className="pr-6 font-mono text-xs text-muted-foreground">
                       {row.tagIds && row.tagIds.length > 0 ? row.tagIds.join(', ') : '-'}
