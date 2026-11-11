@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../lib/asyncHandler.js';
 import { UniformsController } from './uniforms.controller.js';
+import { createUniformShipmentsRouter } from './uniformShipments.js';
 
 export function createUniformsRouter(controller: UniformsController) {
   const router = Router();
@@ -17,6 +18,8 @@ export function createUniformsRouter(controller: UniformsController) {
 
   router.get('/stock', asyncHandler(controller.getStock));
   router.get('/stock/by-unit', asyncHandler(controller.getStockByUnit));
+
+  router.use('/shipments', createUniformShipmentsRouter());
 
   return router;
 }

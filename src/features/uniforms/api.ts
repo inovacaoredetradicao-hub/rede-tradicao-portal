@@ -1,6 +1,6 @@
 import { authHeaders, notifyIfUnauthorized } from '@/lib/session';
 import { getOperationalAlertsBackendBaseUrl } from '../operational-alerts/api';
-import { UniformItem, UniformStockRow, UniformTag, UniformUnitStockRow } from './types';
+import { UniformItem, UniformShipment, UniformStockRow, UniformTag, UniformUnitStockRow } from './types';
 
 const REQUEST_TIMEOUT_MS = 10000;
 
@@ -57,3 +57,15 @@ export const getUniformStock = (unitId?: string) =>
   request<UniformStockRow[]>(`/stock${unitId ? `?unitId=${unitId}` : ''}`);
 
 export const getUniformStockByUnit = () => request<UniformUnitStockRow[]>('/stock/by-unit');
+
+export const getUniformShipments = (filters: { status?: string; unitId?: string; from?: string; to?: string } = {}) => {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const query = params.toString();
+  return request<UniformShipment[]>(`/shipments${query ? `?${query}` : ''}`);
+};
+
+export const cancelUniformShipment = (id: string) =>
+  request<UniformShipment>(`/shipments/${encodeURIComponent(id)}/cancel`, { method: 'POST' });

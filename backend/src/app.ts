@@ -100,7 +100,8 @@ export function createApp() {
     console.error('[backend] erro não tratado:', error);
 
     const message = error instanceof Error ? error.message : 'Erro interno do servidor.';
-    response.status(500).json({ message });
+    const status = Number((error as { status?: unknown })?.status);
+    response.status(status >= 400 && status < 600 ? status : 500).json({ message });
   });
 
   return { app, service };

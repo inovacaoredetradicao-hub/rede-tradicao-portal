@@ -44,3 +44,32 @@ export interface UniformUnitStockRow {
   uniformSize: string;
   quantity: number;
 }
+
+export type UniformShipmentStatus = 'em_transito' | 'recebido' | 'cancelado';
+
+export interface UniformShipmentItem {
+  tagId: string;
+  uniformItemId: string;
+  uniformName: string;
+  uniformSize: string;
+  quantity: number;
+}
+
+export interface UniformShipment {
+  id: string;
+  code: string;
+  status: UniformShipmentStatus;
+  note: string | null;
+  fromUnitId: string;
+  fromUnitName: string;
+  toUnitId: string;
+  toUnitName: string;
+  createdByName: string | null;
+  createdAt: string;
+  receivedByName: string | null;
+  receivedAt: string | null;
+  cancelledByName: string | null;
+  cancelledAt: string | null;
+  totalQuantity: number;
+  items: UniformShipmentItem[];
+}

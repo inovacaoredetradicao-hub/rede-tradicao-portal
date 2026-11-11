@@ -1,5 +1,5 @@
-/** "admin" = Gestao (portal completo); "auditor" = Filial. */
-export type ManagedUserRole = 'admin' | 'auditor';
+/** "admin" = Gestao (portal completo); "auditor" = Filial; "rh" = RH da matriz (no app so ve Uniformes). */
+export type ManagedUserRole = 'admin' | 'auditor' | 'rh';
 
 export interface ManagedUserUnit {
   id: string;
@@ -31,4 +31,5 @@ export interface ManagedUserInput {
 export const ROLE_LABELS: Record<ManagedUserRole, string> = {
   admin: 'Gestao',
   auditor: 'Filial',
+  rh: 'RH (Matriz)',
 };

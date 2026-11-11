@@ -138,6 +138,10 @@ export const UsersAdminPage: React.FC = () => {
       toast.error('Usuario de filial precisa ter ao menos uma filial marcada.');
       return;
     }
+    if (form.role === 'rh' && form.unitIds.length === 0) {
+      toast.error('Usuario do RH precisa ter o estoque da matriz marcado em Filiais.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -242,6 +246,7 @@ export const UsersAdminPage: React.FC = () => {
           <option value="todos">Todos os perfis</option>
           <option value="admin">Gestao</option>
           <option value="auditor">Filial</option>
+          <option value="rh">RH (Matriz)</option>
         </select>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input
@@ -378,8 +383,8 @@ export const UsersAdminPage: React.FC = () => {
 
             <div className="space-y-1.5">
               <Label>Perfil</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {(['auditor', 'admin'] as ManagedUserRole[]).map((role) => (
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(['auditor', 'rh', 'admin'] as ManagedUserRole[]).map((role) => (
                   <button
                     key={role}
                     type="button"
@@ -393,7 +398,9 @@ export const UsersAdminPage: React.FC = () => {
                     <p className="text-xs text-muted-foreground">
                       {role === 'admin'
                         ? 'Portal completo: contagens, produtos e relatorios de todas as filiais.'
-                        : 'Usa o app e recebe disparos das filiais marcadas abaixo.'}
+                        : role === 'rh'
+                          ? 'No app so acessa Uniformes: separa e envia do estoque da matriz (marque a matriz abaixo).'
+                          : 'Usa o app e recebe disparos das filiais marcadas abaixo.'}
                     </p>
                   </button>
                 ))}

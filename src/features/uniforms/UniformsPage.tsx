@@ -21,6 +21,7 @@ import {
   getUniformTags,
 } from './api';
 import { UniformItem, UniformStockRow, UniformTag, UniformUnitStockRow } from './types';
+import { ShipmentsTab } from './ShipmentsTab';
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString('pt-BR');
@@ -409,7 +410,7 @@ export const UniformsPage: React.FC = () => {
         </div>
         <div>
           <h2 className="text-3xl font-bold text-foreground">Inventario de Uniformes</h2>
-          <p className="text-muted-foreground">Etiquetas, entradas, saidas e estoque por unidade.</p>
+          <p className="text-muted-foreground">Etiquetas, entradas, remessas para as filiais e estoque por unidade.</p>
         </div>
       </div>
 
@@ -417,6 +418,7 @@ export const UniformsPage: React.FC = () => {
         <TabsList>
           <TabsTrigger value="stock">Estoque</TabsTrigger>
           <TabsTrigger value="by-unit">Por filial</TabsTrigger>
+          <TabsTrigger value="shipments">Remessas</TabsTrigger>
           <TabsTrigger value="labels">Etiquetas</TabsTrigger>
           <TabsTrigger value="catalog">Catalogo</TabsTrigger>
         </TabsList>
@@ -425,6 +427,9 @@ export const UniformsPage: React.FC = () => {
         </TabsContent>
         <TabsContent value="by-unit">
           <StockByUnitTab />
+        </TabsContent>
+        <TabsContent value="shipments">
+          <ShipmentsTab />
         </TabsContent>
         <TabsContent value="labels">
           <LabelsTab />
