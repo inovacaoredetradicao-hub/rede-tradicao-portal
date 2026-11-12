@@ -193,7 +193,7 @@ export const LossDashboard: React.FC = () => {
       (item) =>
         (typeFilter === 'todos' || (typeFilter === 'repetidos' ? item.repeated_lot : item.loss_type === typeFilter)) &&
         (!term ||
-          [item.code, item.name, item.lot, item.unit_name, item.seller_name].some((value) => value?.toLowerCase().includes(term))),
+          [item.code, item.product_code, item.name, item.lot, item.unit_name, item.seller_name].some((value) => value?.toLowerCase().includes(term))),
     );
   }, [items, search, typeFilter]);
 
@@ -392,7 +392,8 @@ export const LossDashboard: React.FC = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="pl-6">Codigo</TableHead>
+                    <TableHead className="pl-6 whitespace-nowrap">Cod. reduzido</TableHead>
+                    <TableHead className="whitespace-nowrap">Cod. barras</TableHead>
                     <TableHead>Produto</TableHead>
                     <TableHead>Filial</TableHead>
                     <TableHead>Lote</TableHead>
@@ -415,7 +416,8 @@ export const LossDashboard: React.FC = () => {
                     const repeated = item.repeated_lot;
                     return (
                       <TableRow key={`${item.source_session_id}-${item.item_id}`}>
-                        <TableCell className="pl-6 tabular-nums">{item.code ?? '-'}</TableCell>
+                        <TableCell className="pl-6 font-semibold tabular-nums">{item.product_code ?? '-'}</TableCell>
+                        <TableCell className="tabular-nums">{item.code ?? '-'}</TableCell>
                         <TableCell className="max-w-[240px]">
                           <span className="flex items-center gap-1.5">
                             <span className="truncate font-medium text-foreground" title={item.name ?? ''}>

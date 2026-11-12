@@ -190,6 +190,7 @@ export interface LossItem {
   loss_reason: string | null;
   repeated_lot: boolean;
   has_photo: boolean;
+  product_code?: string | null;
   settlement: string | null;
   invoice_number: string | null;
 }

@@ -332,7 +332,9 @@ export const ReturnsPage: React.FC = () => {
                         )}
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-medium text-foreground">{item.name}</p>
-                          <p className="text-muted-foreground">Cod {item.code}</p>
+                          <p className="text-muted-foreground">
+                            Cod. reduzido <span className="font-semibold text-foreground">{item.productCode ?? '-'}</span> · Cod. barras {item.code}
+                          </p>
                           {(item.lot || item.expiresAt) && (
                             <p className="text-xs text-muted-foreground">
                               {[item.lot && `Lote ${item.lot}`, item.expiresAt && `Val ${String(item.expiresAt).split('-').reverse().join('/')}`, item.curve && `Curva ${item.curve}`]
