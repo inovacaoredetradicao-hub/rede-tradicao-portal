@@ -70,6 +70,7 @@ export interface UniformShipment {
   receivedAt: string | null;
   cancelledByName: string | null;
   cancelledAt: string | null;
+  receivedVia: 'app' | 'portal' | null;
   totalQuantity: number;
   items: UniformShipmentItem[];
 }

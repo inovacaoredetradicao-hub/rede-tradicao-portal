@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Download, RefreshCcw, XCircle } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, Download, RefreshCcw, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,12 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getOperationalUnits } from '../operational-alerts/api';
 import { OperationalUnitOption } from '../operational-alerts/types';
-import { cancelUniformShipment, getUniformShipments } from './api';
+import { cancelUniformShipment, getUniformShipments, receiveUniformShipment } from './api';
 import { UniformShipment, UniformShipmentStatus } from './types';
 
 const STATUS_LABELS: Record<UniformShipmentStatus, string> = {
   em_transito: 'Em transito',
-  recebido: 'Recebido pela filial',
+  recebido: 'Recebido',
   cancelado: 'Cancelado',
 };
 
@@ -32,7 +32,21 @@ function daysSince(value: string) {
 }
 
 function exportCsv(rows: UniformShipment[]) {
-  const header = ['Remessa', 'Status', 'Enviada em', 'Enviada por', 'Origem', 'Destino', 'Uniforme', 'Tamanho', 'Etiqueta', 'Quantidade', 'Recebida em', 'Recebida por'];
+  const header = [
+    'Remessa',
+    'Status',
+    'Enviada em',
+    'Enviada por',
+    'Origem',
+    'Destino',
+    'Uniforme',
+    'Tamanho',
+    'Etiqueta',
+    'Quantidade',
+    'Recebida em',
+    'Recebida por',
+    'Confirmada via',
+  ];
   const lines = [header];
   for (const row of rows) {
     for (const item of row.items) {
@@ -49,6 +63,7 @@ function exportCsv(rows: UniformShipment[]) {
         String(item.quantity),
         formatDateTime(row.receivedAt),
         row.receivedByName ?? '',
+        row.receivedVia === 'portal' ? 'Portal' : row.receivedVia === 'app' ? 'App' : '',
       ]);
     }
   }
@@ -73,6 +88,7 @@ export const ShipmentsTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [receivingId, setReceivingId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -108,6 +124,25 @@ export const ShipmentsTab: React.FC = () => {
     }
     return result;
   }, [rows]);
+
+  const handleReceive = async (row: UniformShipment) => {
+    if (
+      !window.confirm(
+        `Confirmar o recebimento da remessa ${row.code}?\n\n${row.totalQuantity} peca(s) vao entrar no estoque de ${row.toUnitName}.`,
+      )
+    )
+      return;
+    setReceivingId(row.id);
+    try {
+      await receiveUniformShipment(row.id);
+      toast.success(`Remessa ${row.code} recebida. ${row.totalQuantity} peca(s) no estoque de ${row.toUnitName}.`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Nao foi possivel confirmar o recebimento.');
+    } finally {
+      setReceivingId(null);
+    }
+  };
 
   const handleCancel = async (row: UniformShipment) => {
     if (!window.confirm(`Cancelar a remessa ${row.code} para ${row.toUnitName}? As pecas voltam a ficar disponiveis no estoque de origem.`)) return;
@@ -151,7 +186,7 @@ export const ShipmentsTab: React.FC = () => {
             >
               <option value="">Todos</option>
               <option value="em_transito">Em transito</option>
-              <option value="recebido">Recebido pela filial</option>
+              <option value="recebido">Recebido</option>
               <option value="cancelado">Cancelado</option>
             </select>
           </div>
@@ -198,8 +233,8 @@ export const ShipmentsTab: React.FC = () => {
         <CardHeader>
           <CardTitle className="text-xl">Remessas</CardTitle>
           <CardDescription>
-            Lotes separados e enviados pelo RH. A remessa sai do estoque de origem e entra no da filial so quando a filial le o
-            codigo e confirma o recebimento no app.
+            Lotes separados e enviados pelo RH. As pecas saem do estoque da matriz no envio e entram no estoque da filial quando o
+            recebimento e confirmado (pelo app da filial ou aqui no portal). Se a remessa for cancelada, as pecas voltam para a origem.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -253,7 +288,10 @@ export const ShipmentsTab: React.FC = () => {
                           {row.status === 'recebido' ? (
                             <>
                               <div>{formatDateTime(row.receivedAt)}</div>
-                              <div className="text-xs text-muted-foreground">{row.receivedByName ?? '-'}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {row.receivedByName ?? '-'}
+                                {row.receivedVia === 'portal' ? ' · pelo portal' : row.receivedVia === 'app' ? ' · pelo app' : ''}
+                              </div>
                             </>
                           ) : row.status === 'cancelado' ? (
                             <>
@@ -266,6 +304,20 @@ export const ShipmentsTab: React.FC = () => {
                         </TableCell>
                         <TableCell className="pr-6 text-right">
                           {row.status === 'em_transito' ? (
+                            <div className="flex justify-end gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              disabled={receivingId === row.id || cancellingId === row.id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleReceive(row);
+                              }}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              {receivingId === row.id ? 'Confirmando...' : 'Confirmar recebimento'}
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -279,6 +331,7 @@ export const ShipmentsTab: React.FC = () => {
                               <XCircle className="h-4 w-4" />
                               {cancellingId === row.id ? 'Cancelando...' : 'Cancelar'}
                             </Button>
+                            </div>
                           ) : null}
                         </TableCell>
                       </TableRow>

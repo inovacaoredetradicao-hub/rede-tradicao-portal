@@ -67,5 +67,12 @@ export const getUniformShipments = (filters: { status?: string; unitId?: string;
   return request<UniformShipment[]>(`/shipments${query ? `?${query}` : ''}`);
 };
 
+export const receiveUniformShipment = (id: string) =>
+  request<UniformShipment>(`/shipments/${encodeURIComponent(id)}/receive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ via: 'portal' }),
+  });
+
 export const cancelUniformShipment = (id: string) =>
   request<UniformShipment>(`/shipments/${encodeURIComponent(id)}/cancel`, { method: 'POST' });

@@ -5,9 +5,11 @@ import { pool, query } from '../../lib/db.js';
 
 // Remessas de uniformes (Separar e enviar): o RH da matriz bipa as etiquetas das pecas,
 // escolhe a filial e envia. A remessa fica "em_transito" com um codigo/QR (REM-XXXXXX)
-// que vai junto das pecas. Quando a filial le o codigo e confirma, as pecas saem do
-// estoque de origem e entram no da filial. Enquanto esta em transito, as pecas ficam
-// reservadas (nao podem ir em outra remessa), mas continuam contadas na origem.
+// que vai junto das pecas. Ao enviar, as pecas ja saem do estoque de origem (ficam "em
+// transito"). Quando a filial (ou a Gestao, pelo portal) confirma o recebimento, entram
+// no estoque da filial. Se a remessa for cancelada, voltam para o estoque de origem.
+// Remessas antigas (stock_deducted = false) seguem a regra anterior: so baixavam a
+// origem na confirmacao.
 
 type ShipmentStatus = 'em_transito' | 'recebido' | 'cancelado';
 type SessionUser = { id: string; name: string; username: string; role: string };
@@ -52,6 +54,24 @@ export async function ensureShipmentTables() {
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_uniform_shipments_status ON uniform_shipments (status, created_at DESC)`);
   await query(`ALTER TABLE uniform_stock_movements ADD COLUMN IF NOT EXISTS shipment_id UUID NULL REFERENCES uniform_shipments(id)`);
+  // So acrescenta colunas; remessas ja existentes ficam com stock_deducted = false.
+  await query(`ALTER TABLE uniform_shipments ADD COLUMN IF NOT EXISTS stock_deducted BOOLEAN NOT NULL DEFAULT false`);
+  await query(`ALTER TABLE uniform_shipments ADD COLUMN IF NOT EXISTS received_via TEXT NULL`);
+}
+
+type Queryable = { query: typeof pool.query };
+
+async function bumpUnitStock(client: Queryable, unitId: string, uniformItemId: string, delta: number) {
+  await client.query(
+    `
+      INSERT INTO uniform_unit_stock (unit_id, uniform_item_id, quantity, updated_at)
+      VALUES ($1, $2, GREATEST($3, 0), NOW())
+      ON CONFLICT (unit_id, uniform_item_id) DO UPDATE SET
+        quantity = GREATEST(uniform_unit_stock.quantity + $3, 0),
+        updated_at = NOW()
+    `,
+    [unitId, uniformItemId, delta],
+  );
 }
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -96,6 +116,7 @@ const shipmentSelect = `
   s.received_at AS "receivedAt",
   s.cancelled_by_name AS "cancelledByName",
   s.cancelled_at AS "cancelledAt",
+  s.received_via AS "receivedVia",
   COALESCE((SELECT SUM(i.quantity) FROM uniform_shipment_items i WHERE i.shipment_id = s.id), 0)::int AS "totalQuantity",
   COALESCE((
     SELECT json_agg(json_build_object(
@@ -122,9 +143,9 @@ async function getShipment(where: string, value: string) {
   return result.rows[0] ?? null;
 }
 
-// Quanto da etiqueta ainda pode ser enviado: estoque da etiqueta menos o que ja esta
-// reservado em remessas em transito.
-async function availableByTag(client: { query: typeof pool.query }, tagIds: string[], ignoreShipmentId?: string) {
+// Quanto da etiqueta ainda pode ser enviado: estoque da etiqueta menos o que esta
+// reservado em remessas antigas em transito (as novas ja baixaram a etiqueta ao enviar).
+async function availableByTag(client: Queryable, tagIds: string[], ignoreShipmentId?: string) {
   const result = await client.query<{
     id: string;
     unit_id: string | null;
@@ -137,7 +158,8 @@ async function availableByTag(client: { query: typeof pool.query }, tagIds: stri
         COALESCE((
           SELECT SUM(i.quantity) FROM uniform_shipment_items i
           JOIN uniform_shipments s ON s.id = i.shipment_id
-          WHERE i.tag_id = t.id AND s.status = 'em_transito' AND ($2::uuid IS NULL OR s.id <> $2::uuid)
+          WHERE i.tag_id = t.id AND s.status = 'em_transito' AND NOT s.stock_deducted
+            AND ($2::uuid IS NULL OR s.id <> $2::uuid)
         ), 0)::int AS reserved
       FROM uniform_tags t
       WHERE t.id = ANY($1::text[])
@@ -318,8 +340,8 @@ export function createUniformShipmentsRouter() {
         for (let attempt = 0; attempt < 5 && !shipmentId; attempt += 1) {
           const created = await client.query<{ id: string }>(
             `
-              INSERT INTO uniform_shipments (code, from_unit_id, to_unit_id, note, created_by_id, created_by_name)
-              VALUES ($1, $2, $3, $4, $5, $6)
+              INSERT INTO uniform_shipments (code, from_unit_id, to_unit_id, note, created_by_id, created_by_name, stock_deducted)
+              VALUES ($1, $2, $3, $4, $5, $6, true)
               ON CONFLICT (code) DO NOTHING
               RETURNING id
             `,
@@ -329,11 +351,26 @@ export function createUniformShipmentsRouter() {
         }
         if (!shipmentId) throw new Error('Nao foi possivel gerar o codigo da remessa. Tente de novo.');
 
+        // As pecas ja saem do estoque de origem no envio.
         for (const [tagId, quantity] of merged) {
+          const uniformItemId = info.get(tagId)!.uniform_item_id!;
           await client.query(
             `INSERT INTO uniform_shipment_items (shipment_id, tag_id, uniform_item_id, quantity) VALUES ($1, $2, $3, $4)`,
-            [shipmentId, tagId, info.get(tagId)!.uniform_item_id, quantity],
+            [shipmentId, tagId, uniformItemId, quantity],
           );
+          const updated = await client.query(
+            `UPDATE uniform_tags SET quantity = quantity - $2, updated_at = NOW() WHERE id = $1 AND quantity >= $2`,
+            [tagId, quantity],
+          );
+          if (!updated.rowCount) throw new HttpError(409, `Etiqueta ${tagId}: estoque insuficiente para o envio.`);
+          await client.query(
+            `
+              INSERT INTO uniform_stock_movements (tag_id, uniform_item_id, type, quantity, unit_id, from_unit_id, user_id, shipment_id)
+              VALUES ($1, $2, 'saida', $3, $4, $5, $6, $7)
+            `,
+            [tagId, uniformItemId, quantity, toUnitId, fromUnitId, user.id, shipmentId],
+          );
+          await bumpUnitStock(client, fromUnitId, uniformItemId, -quantity);
         }
         await client.query('COMMIT');
         response.status(201).json(await getShipment('s.id', shipmentId));
@@ -346,7 +383,7 @@ export function createUniformShipmentsRouter() {
     }),
   );
 
-  // Filial confirma o recebimento: sai da origem e entra no destino.
+  // Confirma o recebimento (filial no app ou Gestao/RH no portal): entra no estoque da filial.
   router.post(
     '/:id/receive',
     asyncHandler(async (request: Request, response: Response) => {
@@ -354,8 +391,15 @@ export function createUniformShipmentsRouter() {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        const found = await client.query<{ id: string; code: string; status: ShipmentStatus; from_unit_id: string; to_unit_id: string }>(
-          `SELECT id, code, status, from_unit_id::text AS from_unit_id, to_unit_id::text AS to_unit_id
+        const found = await client.query<{
+          id: string;
+          code: string;
+          status: ShipmentStatus;
+          from_unit_id: string;
+          to_unit_id: string;
+          stock_deducted: boolean;
+        }>(
+          `SELECT id, code, status, from_unit_id::text AS from_unit_id, to_unit_id::text AS to_unit_id, stock_deducted
            FROM uniform_shipments WHERE id::text = $1 FOR UPDATE`,
           [String(request.params.id)],
         );
@@ -364,10 +408,15 @@ export function createUniformShipmentsRouter() {
         if (shipment.status === 'recebido') throw new HttpError(409, `A remessa ${shipment.code} ja foi recebida.`);
         if (shipment.status === 'cancelado') throw new HttpError(409, `A remessa ${shipment.code} foi cancelada pelo RH.`);
 
+        // Pode confirmar: a filial de destino, ou o RH/Gestao responsavel pela origem
+        // (enquanto as filiais ainda nao confirmam pelo app, a confirmacao e feita no portal).
         const scoped = await scopedUnitIds(user);
-        if (scoped && !scoped.includes(shipment.to_unit_id)) {
+        const isDestination = !scoped || scoped.includes(shipment.to_unit_id);
+        const isSender = canSend(user) && (!scoped || scoped.includes(shipment.from_unit_id));
+        if (!isDestination && !isSender) {
           throw new HttpError(403, 'Esta remessa e de outra filial. Somente a filial de destino confirma o recebimento.');
         }
+        const via = request.body?.via === 'portal' ? 'portal' : 'app';
 
         const items = await client.query<{ tag_id: string; uniform_item_id: string; quantity: number }>(
           `SELECT tag_id, uniform_item_id::text AS uniform_item_id, quantity FROM uniform_shipment_items WHERE shipment_id = $1`,
@@ -376,6 +425,12 @@ export function createUniformShipmentsRouter() {
         await client.query(`SELECT id FROM uniform_tags WHERE id = ANY($1::text[]) FOR UPDATE`, [items.rows.map((row) => row.tag_id)]);
 
         for (const item of items.rows) {
+          if (shipment.stock_deducted) {
+            // A origem ja foi baixada no envio: so entra no estoque da filial.
+            await bumpUnitStock(client, shipment.to_unit_id, item.uniform_item_id, item.quantity);
+            continue;
+          }
+          // Remessa antiga: baixa a origem agora e entra na filial.
           const updated = await client.query(
             `UPDATE uniform_tags SET quantity = quantity - $2, updated_at = NOW() WHERE id = $1 AND quantity >= $2`,
             [item.tag_id, item.quantity],
@@ -390,26 +445,14 @@ export function createUniformShipmentsRouter() {
             `,
             [item.tag_id, item.uniform_item_id, item.quantity, shipment.to_unit_id, shipment.from_unit_id, user.id, shipment.id],
           );
-          for (const [unitId, delta] of [
-            [shipment.from_unit_id, -item.quantity],
-            [shipment.to_unit_id, item.quantity],
-          ] as const) {
-            await client.query(
-              `
-                INSERT INTO uniform_unit_stock (unit_id, uniform_item_id, quantity, updated_at)
-                VALUES ($1, $2, GREATEST($3, 0), NOW())
-                ON CONFLICT (unit_id, uniform_item_id) DO UPDATE SET
-                  quantity = GREATEST(uniform_unit_stock.quantity + $3, 0),
-                  updated_at = NOW()
-              `,
-              [unitId, item.uniform_item_id, delta],
-            );
-          }
+          await bumpUnitStock(client, shipment.from_unit_id, item.uniform_item_id, -item.quantity);
+          await bumpUnitStock(client, shipment.to_unit_id, item.uniform_item_id, item.quantity);
         }
 
         await client.query(
-          `UPDATE uniform_shipments SET status = 'recebido', received_by_id = $2, received_by_name = $3, received_at = NOW() WHERE id = $1`,
-          [shipment.id, user.id, user.name],
+          `UPDATE uniform_shipments SET status = 'recebido', received_by_id = $2, received_by_name = $3, received_at = NOW(), received_via = $4
+           WHERE id = $1`,
+          [shipment.id, user.id, user.name, via],
         );
         await client.query('COMMIT');
         response.json(await getShipment('s.id', shipment.id));
@@ -422,25 +465,62 @@ export function createUniformShipmentsRouter() {
     }),
   );
 
-  // RH/Gestao cancela uma remessa ainda em transito: libera a reserva, nada muda no estoque.
+  // RH/Gestao cancela uma remessa ainda em transito: as pecas voltam para o estoque de origem.
   router.post(
     '/:id/cancel',
     asyncHandler(async (request: Request, response: Response) => {
       const user = sessionUser(response);
       if (!canSend(user)) throw new HttpError(403, 'Somente o RH (Matriz) ou a Gestao pode cancelar uma remessa.');
-      const shipment = await getShipment('s.id::text', String(request.params.id));
-      if (!shipment) throw new HttpError(404, 'Remessa nao encontrada.');
-      const scoped = await scopedUnitIds(user);
-      if (scoped && !scoped.includes(String(shipment.fromUnitId))) {
-        throw new HttpError(403, 'Esta remessa saiu de um estoque que nao esta vinculado ao seu usuario.');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const found = await client.query<{ id: string; code: string; status: ShipmentStatus; from_unit_id: string; stock_deducted: boolean }>(
+          `SELECT id, code, status, from_unit_id::text AS from_unit_id, stock_deducted
+           FROM uniform_shipments WHERE id::text = $1 FOR UPDATE`,
+          [String(request.params.id)],
+        );
+        const shipment = found.rows[0];
+        if (!shipment) throw new HttpError(404, 'Remessa nao encontrada.');
+        const scoped = await scopedUnitIds(user);
+        if (scoped && !scoped.includes(shipment.from_unit_id)) {
+          throw new HttpError(403, 'Esta remessa saiu de um estoque que nao esta vinculado ao seu usuario.');
+        }
+        if (shipment.status !== 'em_transito') throw new HttpError(409, 'So e possivel cancelar remessas que ainda estao em transito.');
+
+        if (shipment.stock_deducted) {
+          const items = await client.query<{ tag_id: string; uniform_item_id: string; quantity: number }>(
+            `SELECT tag_id, uniform_item_id::text AS uniform_item_id, quantity FROM uniform_shipment_items WHERE shipment_id = $1`,
+            [shipment.id],
+          );
+          for (const item of items.rows) {
+            // Devolve a etiqueta (se ela ainda for do mesmo uniforme) e o estoque de origem.
+            await client.query(
+              `UPDATE uniform_tags SET quantity = quantity + $2, updated_at = NOW() WHERE id = $1 AND uniform_item_id::text = $3`,
+              [item.tag_id, item.quantity, item.uniform_item_id],
+            );
+            await client.query(
+              `
+                INSERT INTO uniform_stock_movements (tag_id, uniform_item_id, type, quantity, unit_id, location_label, user_id, shipment_id)
+                VALUES ($1, $2, 'entrada', $3, $4, $5, $6, $7)
+              `,
+              [item.tag_id, item.uniform_item_id, item.quantity, shipment.from_unit_id, `Remessa ${shipment.code} cancelada`, user.id, shipment.id],
+            );
+            await bumpUnitStock(client, shipment.from_unit_id, item.uniform_item_id, item.quantity);
+          }
+        }
+
+        await client.query(
+          `UPDATE uniform_shipments SET status = 'cancelado', cancelled_by_name = $2, cancelled_at = NOW() WHERE id = $1`,
+          [shipment.id, user.name],
+        );
+        await client.query('COMMIT');
+        response.json(await getShipment('s.id', shipment.id));
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
       }
-      const result = await query(
-        `UPDATE uniform_shipments SET status = 'cancelado', cancelled_by_name = $2, cancelled_at = NOW()
-         WHERE id::text = $1 AND status = 'em_transito'`,
-        [String(request.params.id), user.name],
-      );
-      if (!result.rowCount) throw new HttpError(409, 'So e possivel cancelar remessas que ainda estao em transito.');
-      response.json(await getShipment('s.id::text', String(request.params.id)));
     }),
   );
 

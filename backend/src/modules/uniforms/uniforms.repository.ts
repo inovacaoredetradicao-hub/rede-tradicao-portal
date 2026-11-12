@@ -83,6 +83,10 @@ export class UniformsRepository {
             SELECT quantity FROM uniform_unit_stock WHERE uniform_item_id::text = $1
             UNION ALL
             SELECT quantity FROM uniform_tags WHERE uniform_item_id::text = $1
+            UNION ALL
+            SELECT i.quantity FROM uniform_shipment_items i
+            JOIN uniform_shipments s ON s.id = i.shipment_id
+            WHERE i.uniform_item_id::text = $1 AND s.status = 'em_transito'
           ) q
         `,
         [itemId],
