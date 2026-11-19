@@ -453,7 +453,9 @@ export const LossDashboard: React.FC = () => {
                         <TableCell className="text-right tabular-nums">{qty.format(item.quantity)}</TableCell>
                         <TableCell className="text-right tabular-nums">{brl.format(item.unit_cost)}</TableCell>
                         <TableCell className="text-right font-semibold tabular-nums">{brl.format(item.total_cost)}</TableCell>
-                        <TableCell>{item.promotion === null ? '-' : item.promotion ? 'Sim' : 'Nao'}</TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {item.promotion === null ? (item.loss_type === 'avariado' ? 'Nao se aplica' : '-') : item.promotion ? 'Sim' : 'Nao'}
+                        </TableCell>
                         <TableCell className="whitespace-nowrap">{item.loss_reason ? label(LOSS_REASON_LABELS, item.loss_reason) : '-'}</TableCell>
                         <TableCell className="whitespace-nowrap">
                           {item.settlement === 'bonificacao' ? `Bonificacao${item.invoice_number ? ` (NF ${item.invoice_number})` : ''}` : 'Perda'}
