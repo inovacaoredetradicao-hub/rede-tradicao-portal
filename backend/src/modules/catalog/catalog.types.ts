@@ -15,5 +15,6 @@ export interface CatalogUnit {
   name: string;
   city: string | null;
   state: string | null;
+  cnpj: string | null;
   isActive: boolean;
 }

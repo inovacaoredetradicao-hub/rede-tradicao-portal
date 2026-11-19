@@ -54,6 +54,12 @@ function generateGroupId(): string {
 
 const stockFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
 
+// Contagens so para as filiais destas empresas (raiz do CNPJ): MP, MPS e FENIX.
+const COUNT_CNPJ_ROOTS = ['23448964', '37435735', '05315892'];
+
+// Usuario escolhido no disparo e sempre de uma filial: "unitId|userId".
+const userKey = (unitId: string, userId: string) => `${unitId}|${userId}`;
+
 /** Estoque do produto na filial escolhida no disparo (ou total, sem filial). */
 const StockBadge: React.FC<{ value?: number; unitSelected: boolean }> = ({ value, unitSelected }) => {
   if (value === undefined) return null;
@@ -85,6 +91,9 @@ interface RuleFormState {
   barcode: string;
   productName: string;
   selectedProductIds: string[];
+  /** Filiais escolhidas no disparo. */
+  unitIds: string[];
+  /** Filial unica (quando ha so uma escolhida): estoque e classificacoes daquela filial. */
   unitId: string;
   unitName: string;
   frequency: CountFrequency;
@@ -104,6 +113,7 @@ const EMPTY_FORM: RuleFormState = {
   barcode: '',
   productName: '',
   selectedProductIds: [],
+  unitIds: [],
   unitId: '',
   unitName: '',
   frequency: 'diario',
@@ -132,7 +142,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
   const keepResponsibles = isGroupEdit && (editingGroup?.responsibleCount ?? 1) > 1;
   const [form, setForm] = useState<RuleFormState>(EMPTY_FORM);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [usersForUnit, setUsersForUnit] = useState<OperationalUserOption[]>([]);
+  const [usersByUnit, setUsersByUnit] = useState<Record<string, OperationalUserOption[]>>({});
   const [loadingUsers, setLoadingUsers] = useState(false);
   // Busca de produtos sob demanda (botao/Enter) - nao ha mais catalogo inteiro em memoria.
   const [selectedProducts, setSelectedProducts] = useState<OperationalProductOption[]>([]);
@@ -183,6 +193,7 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
       barcode: editingRule.barcode,
       productName: editingRule.productName,
       selectedProductIds: [],
+      unitIds: [editingRule.unitId],
       unitId: editingRule.unitId,
       unitName: editingRule.unitName,
       frequency: editingRule.frequency,
@@ -190,27 +201,30 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
       isActive: editingRule.isActive,
       startDate: editingRule.startDate,
       endDate: editingRule.endDate || '',
-      selectedUserIds: editingRule.responsibleUserId ? [editingRule.responsibleUserId] : [],
+      selectedUserIds: editingRule.responsibleUserId ? [userKey(editingRule.unitId, editingRule.responsibleUserId)] : [],
       productSearch: '',
       unitSearch: editingRule.unitName,
     });
     setValidationError(null);
   }, [editingRule]);
 
+  // Usuarios vinculados a cada filial escolhida (so busca as que ainda nao vieram).
   useEffect(() => {
-    if (!form.unitId) {
-      setUsersForUnit([]);
-      return;
-    }
+    const missing = form.unitIds.filter((unitId) => !usersByUnit[unitId]);
+    if (missing.length === 0) return;
 
     let cancelled = false;
     setLoadingUsers(true);
-    getUsersByUnit(form.unitId)
-      .then((result) => {
-        if (!cancelled) setUsersForUnit(result);
-      })
-      .catch(() => {
-        if (!cancelled) setUsersForUnit([]);
+    Promise.all(missing.map((unitId) => getUsersByUnit(unitId).catch(() => [] as OperationalUserOption[])))
+      .then((results) => {
+        if (cancelled) return;
+        setUsersByUnit((current) => {
+          const next = { ...current };
+          missing.forEach((unitId, index) => {
+            next[unitId] = results[index];
+          });
+          return next;
+        });
       })
       .finally(() => {
         if (!cancelled) setLoadingUsers(false);
@@ -219,13 +233,31 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
     return () => {
       cancelled = true;
     };
-  }, [form.unitId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.unitIds.join('|')]);
 
   const unitMap = useMemo(() => {
     return new Map(units.map((unit) => [unit.id, unit]));
   }, [units]);
 
-  const availableUsers = usersForUnit.length > 0 ? usersForUnit : users;
+  // So as filiais das empresas da contagem (raiz do CNPJ). Enquanto a Argo ainda nao
+  // mandou o CNPJ de nenhuma filial, mostra todas para nao travar o disparo.
+  const cnpjLoaded = units.some((unit) => unit.cnpj);
+  const countUnits = useMemo(() => {
+    const allowed = cnpjLoaded ? units.filter((unit) => unit.cnpj && COUNT_CNPJ_ROOTS.includes(unit.cnpj.slice(0, 8))) : units;
+    return [...allowed].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [units, cnpjLoaded]);
+  const [unitFilter, setUnitFilter] = useState('');
+  const visibleUnits = useMemo(() => {
+    const term = unitFilter.trim().toLowerCase();
+    return term ? countUnits.filter((unit) => unit.name.toLowerCase().includes(term)) : countUnits;
+  }, [countUnits, unitFilter]);
+
+  // Usuarios de uma filial; sem ninguem vinculado, todos os usuarios (como antes).
+  const usersOfUnit = (unitId: string) => {
+    const linked = usersByUnit[unitId] ?? [];
+    return linked.length > 0 ? linked : users;
+  };
 
   // Com filial escolhida, as classificacoes (e as contagens) sao so as daquela filial.
   const [unitClassifications, setUnitClassifications] = useState<OperationalClassificationOption[] | null>(null);
@@ -372,36 +404,48 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
 
   const selectedProductsPreview = selectedProducts;
 
-  const handleUnitSelection = (unitId: string) => {
-    const selectedUnit = unitMap.get(unitId);
-    setForm((current) => ({
-      ...current,
-      unitId: selectedUnit?.id ?? '',
-      unitName: selectedUnit?.name ?? '',
-      unitSearch: selectedUnit?.displayLabel ?? '',
-      selectedUserIds: [],
-    }));
+  const setUnits = (unitIds: string[]) => {
+    setForm((current) => {
+      const single = unitIds.length === 1 ? unitMap.get(unitIds[0]) : undefined;
+      return {
+        ...current,
+        unitIds,
+        unitId: single?.id ?? '',
+        unitName: single?.name ?? '',
+        unitSearch: single?.displayLabel ?? '',
+        // Mantem os usuarios ja marcados das filiais que continuam escolhidas.
+        selectedUserIds: current.selectedUserIds.filter((key) => unitIds.includes(key.split('|')[0])),
+      };
+    });
   };
 
-  const toggleUser = (userId: string) => {
+  const toggleUnit = (unitId: string) => {
+    setUnits(form.unitIds.includes(unitId) ? form.unitIds.filter((id) => id !== unitId) : [...form.unitIds, unitId]);
+  };
+
+  const toggleUser = (unitId: string, userId: string) => {
+    const key = userKey(unitId, userId);
     setForm((current) => {
       const isEditingSingle = Boolean(editingRule);
       if (isEditingSingle) {
-        return { ...current, selectedUserIds: [userId] };
+        return { ...current, selectedUserIds: [key] };
       }
 
-      const isSelected = current.selectedUserIds.includes(userId);
+      const isSelected = current.selectedUserIds.includes(key);
       return {
         ...current,
         selectedUserIds: isSelected
-          ? current.selectedUserIds.filter((id) => id !== userId)
-          : [...current.selectedUserIds, userId],
+          ? current.selectedUserIds.filter((id) => id !== key)
+          : [...current.selectedUserIds, key],
       };
     });
   };
 
   const selectAllUsers = () => {
-    setForm((current) => ({ ...current, selectedUserIds: availableUsers.map((user) => user.id) }));
+    setForm((current) => ({
+      ...current,
+      selectedUserIds: current.unitIds.flatMap((unitId) => usersOfUnit(unitId).map((user) => userKey(unitId, user.id))),
+    }));
   };
 
   const clearUsers = () => {
@@ -437,8 +481,8 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
   const handleSaveInternal = async () => {
     setValidationError(null);
 
-    if (!form.unitId || !form.unitName || !form.startDate) {
-      setValidationError('Selecione a filial e a data inicial.');
+    if (form.unitIds.length === 0 || !form.startDate) {
+      setValidationError('Selecione ao menos uma filial e a data inicial.');
       return;
     }
 
@@ -447,14 +491,23 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
       return;
     }
 
-    if (form.selectedUserIds.length === 0 && !keepResponsibles) {
-      setValidationError('Selecione ao menos um usuario desta filial para receber o disparo.');
+    // Usuarios escolhidos, por filial.
+    const selectedByUnit = new Map<string, OperationalUserOption[]>();
+    for (const unitId of form.unitIds) {
+      const chosen = usersOfUnit(unitId).filter((user) => form.selectedUserIds.includes(userKey(unitId, user.id)));
+      selectedByUnit.set(unitId, chosen);
+    }
+    const unitsWithoutUser = form.unitIds.filter((unitId) => (selectedByUnit.get(unitId) ?? []).length === 0);
+    if (unitsWithoutUser.length > 0 && !keepResponsibles) {
+      setValidationError(
+        form.unitIds.length === 1
+          ? 'Selecione ao menos um usuario desta filial para receber o disparo.'
+          : `Selecione ao menos um usuario em: ${unitsWithoutUser.map((unitId) => unitMap.get(unitId)?.name ?? unitId).join(', ')}.`,
+      );
       return;
     }
 
-    const selectedUsers = form.selectedUserIds
-      .map((id) => availableUsers.find((user) => user.id === id))
-      .filter((user): user is OperationalUserOption => Boolean(user));
+    const selectedUsers = selectedByUnit.get(form.unitIds[0]) ?? [];
 
     if (isGroupEdit && editingGroup && editingRule) {
       const user = selectedUsers[0];
@@ -503,22 +556,45 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
         return;
       }
 
-      // Lote proprio (groupId) com o nome completo: disparos de grupos diferentes da mesma
-      // classificacao (ex.: BEBIDAS e SNACKS) nao se misturam no mesmo aviso.
-      const groupId = generateGroupId();
-      const payloads = classificationProducts.flatMap((product) =>
-        selectedUsers.map((user) =>
-          buildBasePayload({
-            productId: product.id,
-            barcode: product.barcode,
-            productName: product.name,
-            responsibleUserId: user.id,
-            responsibleUserName: user.name,
-            groupId,
-            groupLabel: selectedLotLabel,
-          }),
-        ),
-      );
+      // Lote proprio (groupId) por filial com o nome completo: disparos de grupos diferentes
+      // da mesma classificacao (ex.: BEBIDAS e SNACKS) nao se misturam no mesmo aviso.
+      // Com uma filial, os produtos ja carregados sao os dela; com varias, busca os de cada uma.
+      const productsByUnit = new Map<string, OperationalProductOption[]>();
+      if (form.unitIds.length === 1) {
+        productsByUnit.set(form.unitIds[0], classificationProducts);
+      } else {
+        const lists = await Promise.all(
+          form.unitIds.map((unitId) =>
+            getProductsByClassification(selectedClassification.label, unitId, subPath.join(' / ') || undefined),
+          ),
+        );
+        form.unitIds.forEach((unitId, index) => productsByUnit.set(unitId, lists[index]));
+      }
+
+      const payloads = form.unitIds.flatMap((unitId) => {
+        const unit = unitMap.get(unitId);
+        const groupId = generateGroupId();
+        return (productsByUnit.get(unitId) ?? []).flatMap((product) =>
+          (selectedByUnit.get(unitId) ?? []).map((user) =>
+            buildBasePayload({
+              unitId,
+              unitName: unit?.name ?? '',
+              productId: product.id,
+              barcode: product.barcode,
+              productName: product.name,
+              responsibleUserId: user.id,
+              responsibleUserName: user.name,
+              groupId,
+              groupLabel: selectedLotLabel,
+            }),
+          ),
+        );
+      });
+
+      if (payloads.length === 0) {
+        setValidationError('Nenhuma das filiais escolhidas tem produtos nesta classificacao.');
+        return;
+      }
 
       await onSubmit(
         { mode: 'classification', classificationKey: selectedClassification.key, classificationLabel: selectedLotLabel, payloads },
@@ -534,20 +610,25 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
         return;
       }
 
-      const groupId = selectedProducts.length > 1 ? generateGroupId() : undefined;
-
-      const payloads = selectedProducts.flatMap((product) =>
-        selectedUsers.map((user) =>
-          buildBasePayload({
-            productId: product.id,
-            barcode: product.barcode,
-            productName: product.name,
-            responsibleUserId: user.id,
-            responsibleUserName: user.name,
-            groupId,
-          }),
-        ),
-      );
+      // Um lote por filial: cada filial recebe o seu aviso.
+      const payloads = form.unitIds.flatMap((unitId) => {
+        const unit = unitMap.get(unitId);
+        const groupId = selectedProducts.length > 1 ? generateGroupId() : undefined;
+        return selectedProducts.flatMap((product) =>
+          (selectedByUnit.get(unitId) ?? []).map((user) =>
+            buildBasePayload({
+              unitId,
+              unitName: unit?.name ?? '',
+              productId: product.id,
+              barcode: product.barcode,
+              productName: product.name,
+              responsibleUserId: user.id,
+              responsibleUserName: user.name,
+              groupId,
+            }),
+          ),
+        );
+      });
 
       await onSubmit({ mode: 'product', payloads }, null);
       onOpenChange(false);
@@ -559,38 +640,85 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>{isGroupEdit ? 'Editar lote' : editingRule ? 'Editar disparo' : 'Novo disparo'}</SheetTitle>
-          <SheetDescription>Escolha a filial, depois quem vai receber o disparo, e por fim o que sera contado.</SheetDescription>
+          <SheetDescription>Escolha as filiais, depois quem vai receber o disparo, e por fim o que sera contado.</SheetDescription>
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="unit-select">1. Filial</Label>
-            <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <select
-                id="unit-select"
-                className="flex h-11 w-full rounded-md border border-input bg-background pl-10 pr-3 text-sm"
-                value={form.unitId}
-                onChange={(event) => handleUnitSelection(event.target.value)}
-                disabled={isGroupEdit}
-              >
-                <option value="">Selecione a filial para disparar</option>
-                {units.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {editingRule ? (
+              <>
+                <Label>1. Filial</Label>
+                <div className="flex h-11 items-center gap-2 rounded-md border border-input bg-muted/30 px-3 text-sm">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  {form.unitName || unitMap.get(form.unitId)?.name || '-'}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="unit-filter">
+                    1. Filiais{' '}
+                    <span className="font-normal text-muted-foreground">
+                      ({form.unitIds.length} de {countUnits.length} selecionada{form.unitIds.length === 1 ? '' : 's'})
+                    </span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setUnits(countUnits.map((unit) => unit.id))}>
+                      Todas
+                    </Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setUnits([])}>
+                      Limpar
+                    </Button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="unit-filter"
+                    className="pl-10"
+                    placeholder="Buscar filial"
+                    value={unitFilter}
+                    onChange={(event) => setUnitFilter(event.target.value)}
+                  />
+                </div>
+                <div className="max-h-56 overflow-y-auto rounded-md border border-border">
+                  {visibleUnits.length === 0 ? (
+                    <p className="p-3 text-sm text-muted-foreground">Nenhuma filial encontrada.</p>
+                  ) : (
+                    visibleUnits.map((unit) => (
+                      <label
+                        key={unit.id}
+                        className="flex cursor-pointer items-center gap-2 border-b border-border/40 px-3 py-2 text-sm last:border-b-0 hover:bg-muted/30"
+                      >
+                        <Checkbox checked={form.unitIds.includes(unit.id)} onCheckedChange={() => toggleUnit(unit.id)} />
+                        <span className="text-foreground">{unit.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {!cnpjLoaded && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    O CNPJ das filiais ainda nao veio da Argo, por isso aparecem todas. Depois da sincronizacao feita apos as 18h,
+                    ficam so as filiais MP, MPS e FENIX.
+                  </p>
+                )}
+                {form.unitIds.length > 1 && (
+                  <p className="text-xs text-muted-foreground">
+                    Cada filial recebe o seu proprio aviso. Com varias filiais, o estoque e as classificacoes mostrados abaixo sao da
+                    rede toda; os produtos de uma classificacao sao buscados em cada filial na hora de salvar.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           <div className="space-y-2 rounded-xl border border-border/60 p-4">
             <div className="flex items-center justify-between gap-2">
-              <Label>2. Usuarios desta filial que vao receber o disparo</Label>
+              <Label>2. Usuarios {form.unitIds.length > 1 ? 'de cada filial' : 'desta filial'} que vao receber o disparo</Label>
               {keepResponsibles && (
                 <span className="text-xs text-muted-foreground">Lote com varios responsaveis: eles serao mantidos.</span>
               )}
-              {!editingRule && availableUsers.length > 0 && (
+              {!editingRule && form.unitIds.length > 0 && (
                 <div className="flex gap-2">
                   <Button type="button" variant="ghost" size="sm" onClick={selectAllUsers}>
                     Todos
@@ -602,27 +730,46 @@ export const OperationalCountRuleForm: React.FC<OperationalCountRuleFormProps> =
               )}
             </div>
 
-            {!form.unitId ? (
+            {form.unitIds.length === 0 ? (
               <p className="text-sm text-muted-foreground">Selecione uma filial primeiro.</p>
-            ) : loadingUsers ? (
-              <p className="text-sm text-muted-foreground">Carregando usuarios da filial...</p>
-            ) : availableUsers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nenhum usuario vinculado a esta filial ainda. Use "Usuarios por filial" para vincular antes de disparar.
-              </p>
+            ) : loadingUsers && form.unitIds.some((unitId) => !usersByUnit[unitId]) ? (
+              <p className="text-sm text-muted-foreground">Carregando usuarios das filiais...</p>
             ) : (
-              <div className="grid gap-2 md:grid-cols-2">
-                {availableUsers.map((user) => (
-                  <label
-                    key={user.id}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                  >
-                    <Checkbox checked={form.selectedUserIds.includes(user.id)} onCheckedChange={() => toggleUser(user.id)} />
-                    <span className="text-foreground">
-                      {user.name} <span className="text-xs text-muted-foreground">({user.role})</span>
-                    </span>
-                  </label>
-                ))}
+              <div className="max-h-96 space-y-3 overflow-y-auto">
+                {form.unitIds.map((unitId) => {
+                  const unitUsers = usersOfUnit(unitId);
+                  return (
+                    <div key={unitId} className="space-y-2">
+                      {form.unitIds.length > 1 && (
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {unitMap.get(unitId)?.name ?? unitId}
+                        </p>
+                      )}
+                      {unitUsers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          Nenhum usuario vinculado a esta filial ainda. Use "Usuarios por filial" para vincular antes de disparar.
+                        </p>
+                      ) : (
+                        <div className="grid gap-2 md:grid-cols-2">
+                          {unitUsers.map((user) => (
+                            <label
+                              key={`${unitId}-${user.id}`}
+                              className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                            >
+                              <Checkbox
+                                checked={form.selectedUserIds.includes(userKey(unitId, user.id))}
+                                onCheckedChange={() => toggleUser(unitId, user.id)}
+                              />
+                              <span className="text-foreground">
+                                {user.name} <span className="text-xs text-muted-foreground">({user.role})</span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

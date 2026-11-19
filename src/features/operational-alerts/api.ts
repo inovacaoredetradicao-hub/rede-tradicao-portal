@@ -147,10 +147,12 @@ function normalizeUnit(raw: any): OperationalUnitOption {
   const id = String(raw.id ?? raw.unitId ?? raw.uuid ?? '');
   const name = String(raw.name ?? raw.unitName ?? raw.description ?? '');
 
+  const cnpj = String(raw.cnpj ?? '').replace(/\D/g, '');
   return {
     id,
     name,
     displayLabel: [name, id].filter(Boolean).join(' • '),
+    cnpj: cnpj || undefined,
   };
 }
 

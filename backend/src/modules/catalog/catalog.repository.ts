@@ -18,6 +18,7 @@ const unitSelect = `
   name,
   city,
   state,
+  cnpj,
   is_active AS "isActive"
 `;
 

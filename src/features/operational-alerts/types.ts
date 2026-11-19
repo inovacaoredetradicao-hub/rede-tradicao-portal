@@ -184,6 +184,8 @@ export interface OperationalUnitOption {
   id: string;
   name: string;
   displayLabel: string;
+  /** CNPJ (14 digitos), quando ja veio da Argo. */
+  cnpj?: string;
 }
 
 export interface OperationalUserOption {
